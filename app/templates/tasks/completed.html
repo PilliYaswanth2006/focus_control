@@ -1,0 +1,101 @@
+{% extends "base.html" %}
+{% block title %}Completed Tasks — Focus &amp; Control{% endblock %}
+{% block breadcrumbs %}
+    <li class="breadcrumb-item"><a href="{{ url_for('tasks.index') }}" class="text-decoration-none">Weighted Task Manager</a></li>
+    <li class="breadcrumb-item active">Completed Tasks</li>
+{% endblock %}
+
+{% block content %}
+<div class="d-flex flex-wrap justify-content-between align-items-end gap-3 mb-4">
+    <div>
+        <h1 class="h4 fw-bold mb-1">Completed Tasks Archive</h1>
+        <p class="small mb-0" style="color: var(--text-muted);">All completed centered tasks and internal tasks with preserved progress records and reopen support.</p>
+    </div>
+    <a href="{{ url_for('tasks.index') }}" class="btn btn-sm btn-outline-secondary">Back to Task Manager</a>
+</div>
+
+<!-- Completed Centered Tasks -->
+<div class="fc-card p-3 mb-4">
+    <h2 class="h6 fw-bold mb-3">Completed Centered Tasks ({{ overview.centered_tasks | length }})</h2>
+    {% if overview.centered_tasks %}
+        <div class="table-responsive">
+            <table class="table table-sm align-middle small mb-0">
+                <thead>
+                    <tr>
+                        <th>Centered Task</th>
+                        <th>Weight</th>
+                        <th>Target</th>
+                        <th>Time Logged</th>
+                        <th>Completed At</th>
+                        <th class="text-end">Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for ct in overview.centered_tasks %}
+                    <tr>
+                        <td class="fw-semibold">
+                            <a href="{{ url_for('tasks.details', task_id=ct.id) }}" class="text-decoration-none">{{ ct.name }}</a>
+                            {% if ct.is_demo %}<span class="badge-demo ms-1">DEMO</span>{% endif %}
+                        </td>
+                        <td class="tabular-nums">{{ ct.weight }}%</td>
+                        <td class="tabular-nums">{{ ct.target_allocation }} {{ ct.target_unit }}</td>
+                        <td class="tabular-nums">{{ ct.metrics.total_time_hours | default(0) }} hrs</td>
+                        <td>{{ (ct.completed_at or ct.updated_at) | local_dt }}</td>
+                        <td class="text-end">
+                            <form method="post" action="{{ url_for('tasks.reopen_centered', task_id=ct.id) }}" class="d-inline">
+                                <input type="hidden" name="reason" value="Reopened from Completed Tasks">
+                                <button type="submit" class="btn btn-sm btn-outline-warning py-0 px-2">Reopen</button>
+                            </form>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    {% else %}
+        <div class="small" style="color: var(--text-muted);">No completed centered tasks yet.</div>
+    {% endif %}
+</div>
+
+<!-- Completed Internal Tasks -->
+<div class="fc-card p-3">
+    <h2 class="h6 fw-bold mb-3">Completed Internal Tasks ({{ overview.task_items | length }})</h2>
+    {% if overview.task_items %}
+        <div class="table-responsive">
+            <table class="table table-sm align-middle small mb-0">
+                <thead>
+                    <tr>
+                        <th>Internal Task</th>
+                        <th>Parent Centered Task</th>
+                        <th>Completed / Target</th>
+                        <th>Entries Preserved</th>
+                        <th>Completed At</th>
+                        <th class="text-end">Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for it in overview.task_items %}
+                    <tr>
+                        <td class="fw-semibold">
+                            <a href="{{ url_for('tasks.item_details', item_id=it.id) }}" class="text-decoration-none">{{ it.name }}</a>
+                        </td>
+                        <td><a href="{{ url_for('tasks.details', task_id=it.parent_centered_task_id) }}" class="text-decoration-none">{{ it.parent_name }}</a></td>
+                        <td class="tabular-nums">{{ it.actual_quantity }} / {{ it.target_quantity }} {{ it.target_unit }} ({{ it.actual_time_hours }} hrs)</td>
+                        <td class="tabular-nums">{{ it.entry_count }}</td>
+                        <td>{{ (it.completed_at or it.updated_at) | local_dt }}</td>
+                        <td class="text-end">
+                            <form method="post" action="{{ url_for('tasks.reopen_item', item_id=it.id) }}" class="d-inline">
+                                <input type="hidden" name="reason" value="Reopened from Completed Tasks">
+                                <button type="submit" class="btn btn-sm btn-outline-warning py-0 px-2">Reopen</button>
+                            </form>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    {% else %}
+        <div class="small" style="color: var(--text-muted);">No completed internal tasks yet.</div>
+    {% endif %}
+</div>
+{% endblock %}

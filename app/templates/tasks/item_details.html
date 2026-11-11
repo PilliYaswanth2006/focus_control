@@ -1,0 +1,294 @@
+{% extends "base.html" %}
+{% block title %}{{ item.name }} — Internal Task Details{% endblock %}
+{% block breadcrumbs %}
+    <li class="breadcrumb-item"><a href="{{ url_for('tasks.index') }}" class="text-decoration-none">Weighted Task Manager</a></li>
+    <li class="breadcrumb-item"><a href="{{ url_for('tasks.details', task_id=item.parent_centered_task_id) }}" class="text-decoration-none">{{ item.parent_name }}</a></li>
+    <li class="breadcrumb-item active">{{ item.name }}</li>
+{% endblock %}
+{% block topbar_actions %}
+    <button type="button"
+            class="btn btn-sm btn-primary fc-open-progress-btn"
+            data-action="{{ url_for('tasks.add_progress', item_id=item.id) }}"
+            data-item-name="{{ item.name }}"
+            data-unit="{{ item.target_unit }}">
+        + Record Progress
+    </button>
+{% endblock %}
+
+{% block content %}
+<div class="fc-card fc-card-task p-4 mb-4">
+    <div class="d-flex flex-wrap justify-content-between align-items-start gap-3">
+        <div>
+            <div class="d-flex align-items-center gap-2 flex-wrap mb-1">
+                <h1 class="h4 fw-bold mb-0">{{ item.name }}</h1>
+                <span class="status-pill status-{{ item.status | lower | replace(' ', '-') }}">{{ item.status }}</span>
+                <span class="badge bg-secondary-subtle text-secondary-emphasis">Weight: {{ item.weight_pct }}%</span>
+            </div>
+            {% if item.description %}
+                <p class="small mb-2" style="color: var(--text-muted);">{{ item.description }}</p>
+            {% endif %}
+            <div class="small" style="color: var(--text-muted);">
+                Parent: <a href="{{ url_for('tasks.details', task_id=item.parent_centered_task_id) }}" class="fw-semibold text-decoration-none">{{ item.parent_name }}</a>
+                {% if item.due_date %} · Due: <strong class="{% if item.is_overdue %}text-danger{% endif %}">{{ item.due_date }}</strong>{% endif %}
+            </div>
+        </div>
+        <div class="text-end">
+            <div class="display-6 fw-bold tabular-nums" style="color: var(--task-accent);">{{ item.completion_pct }}%</div>
+            <div class="small" style="color: var(--text-muted);">
+                <span class="tabular-nums">{{ item.actual_quantity }} / {{ item.target_quantity }} {{ item.target_unit }}</span>
+                · <span class="tabular-nums">{{ item.actual_time_hours }} hrs</span> spent
+            </div>
+        </div>
+    </div>
+
+    <div class="progress mt-3" style="height: 9px;">
+        <div class="progress-bar" style="width: {{ item.completion_pct }}%; background-color: var(--task-accent);"></div>
+    </div>
+
+    {% if item.status == 'Completed' %}
+    <div class="mt-3 p-3 rounded-3 border d-flex flex-wrap justify-content-between align-items-center gap-2" style="background: var(--bg-subtle); border-color: var(--border-color) !important;">
+        <div class="small">
+            <strong>Completed</strong> on {{ item.completed_at | local_dt }}. All progress records are preserved.
+        </div>
+        <button type="button" class="btn btn-sm btn-warning" data-bs-toggle="modal" data-bs-target="#reopen-item-modal">
+            Reopen Task
+        </button>
+    </div>
+    {% endif %}
+</div>
+
+<div class="row g-4 mb-4">
+    <!-- Live Focus Timer Card -->
+    <div class="col-lg-5">
+        <div class="fc-card p-3 h-100">
+            <h2 class="h6 fw-bold mb-2 d-flex align-items-center gap-2">
+                <i data-lucide="timer" style="width: 17px; height: 17px; color: var(--task-accent);"></i>
+                Focus Session Timer
+            </h2>
+            {% if item.active_session %}
+                <div class="p-3 rounded-3 mb-3 text-center" style="background: var(--task-accent-soft);">
+                    <div class="small fw-semibold mb-1" style="color: var(--task-accent);">ACTIVE SESSION</div>
+                    <div class="display-5 fw-bold tabular-nums" data-timer-start="{{ item.active_session.started_at }}">00:00</div>
+                    <div class="small mt-1" style="color: var(--text-muted);">Started {{ item.active_session.started_at | local_dt }}</div>
+                </div>
+                <form method="post" action="{{ url_for('tasks.stop_session', session_id=item.active_session.id) }}">
+                    <div class="row g-2 mb-2">
+                        <div class="col-6">
+                            <label class="form-label small fw-semibold">Quantity ({{ item.target_unit }})</label>
+                            <input type="number" step="0.01" min="0" name="quantity_completed" class="form-control form-control-sm" placeholder="{{ 'Auto hrs' if item.target_unit == 'hours' else '0' }}">
+                        </div>
+                        <div class="col-6">
+                            <label class="form-label small fw-semibold">Notes</label>
+                            <input type="text" name="notes" class="form-control form-control-sm" value="{{ item.active_session.notes }}">
+                        </div>
+                    </div>
+                    <div class="d-flex gap-2">
+                        <button type="submit" class="btn btn-sm btn-success flex-grow-1">Stop &amp; Log Progress</button>
+                        <button type="submit" name="cancel" value="1" class="btn btn-sm btn-outline-secondary">Discard</button>
+                    </div>
+                </form>
+            {% else %}
+                <p class="small mb-3" style="color: var(--text-muted);">Start a live timer while working on this task to automatically log time spent.</p>
+                <form method="post" action="{{ url_for('tasks.start_session', item_id=item.id) }}">
+                    <div class="input-group input-group-sm">
+                        <input type="text" name="notes" class="form-control" placeholder="Session focus goal (optional)">
+                        <button type="submit" class="btn btn-primary">Start Timer</button>
+                    </div>
+                </form>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Edit Internal Task Metadata -->
+    <div class="col-lg-7">
+        <div class="fc-card p-3 h-100">
+            <h2 class="h6 fw-bold mb-3">Edit Internal Task Settings</h2>
+            <form method="post" action="{{ url_for('tasks.edit_item', item_id=item.id) }}" class="needs-validation" novalidate>
+                <div class="row g-2 mb-2">
+                    <div class="col-md-6">
+                        <label class="form-label small fw-semibold">Name</label>
+                        <input type="text" name="name" class="form-control form-control-sm" value="{{ item.name }}" required>
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label small fw-semibold">Weight (%)</label>
+                        <input type="number" step="0.1" min="0" max="100" name="weight_pct" class="form-control form-control-sm" value="{{ item.weight_pct }}" required>
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label small fw-semibold">Priority</label>
+                        <select name="priority" class="form-select form-select-sm">
+                            {% for p in priorities %}
+                                <option value="{{ p }}" {% if item.priority == p %}selected{% endif %}>{{ p }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                </div>
+                <div class="row g-2 mb-2">
+                    <div class="col-md-3">
+                        <label class="form-label small fw-semibold">Target Qty</label>
+                        <input type="number" step="0.01" min="0" name="target_quantity" class="form-control form-control-sm" value="{{ item.target_quantity }}">
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label small fw-semibold">Unit</label>
+                        <input type="text" name="target_unit" class="form-control form-control-sm" value="{{ item.target_unit }}" required>
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label small fw-semibold">Due Date</label>
+                        <input type="date" name="due_date" class="form-control form-control-sm" value="{{ item.due_date }}">
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label small fw-semibold">Status</label>
+                        <select name="status" class="form-select form-select-sm">
+                            {% for s in statuses %}
+                                <option value="{{ s }}" {% if item.status == s %}selected{% endif %}>{{ s }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                </div>
+                <div class="mb-2">
+                    <label class="form-label small fw-semibold">Notes</label>
+                    <textarea name="notes" class="form-control form-control-sm" rows="2">{{ item.notes }}</textarea>
+                </div>
+                <input type="hidden" name="description" value="{{ item.description }}">
+                <input type="hidden" name="start_date" value="{{ item.start_date }}">
+                <button type="submit" class="btn btn-sm btn-outline-primary">Save Changes</button>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Progress Entries History -->
+<div class="fc-card p-3 mb-4">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <h2 class="h6 fw-bold mb-0">Progress Entries ({{ item.progress_entries | length }})</h2>
+        <button type="button"
+                class="btn btn-sm btn-primary fc-open-progress-btn"
+                data-action="{{ url_for('tasks.add_progress', item_id=item.id) }}"
+                data-item-name="{{ item.name }}"
+                data-unit="{{ item.target_unit }}">
+            + Add Progress Entry
+        </button>
+    </div>
+
+    {% if item.progress_entries %}
+        <div class="table-responsive">
+            <table class="table table-sm align-middle small mb-0">
+                <thead>
+                    <tr>
+                        <th>Entry Timestamp</th>
+                        <th>Quantity ({{ item.target_unit }})</th>
+                        <th>Time Spent</th>
+                        <th>Source</th>
+                        <th>Comments</th>
+                        <th class="text-end">Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for pe in item.progress_entries %}
+                    <tr>
+                        <td class="text-nowrap">{{ pe.entry_timestamp | local_dt }}</td>
+                        <td class="tabular-nums fw-semibold">+{{ pe.quantity_completed }}</td>
+                        <td class="tabular-nums">{{ pe.time_spent_minutes }} min</td>
+                        <td><span class="badge bg-secondary-subtle text-secondary-emphasis">{{ pe.update_source }}</span></td>
+                        <td>{{ pe.comments }}</td>
+                        <td class="text-end text-nowrap">
+                            <button type="button"
+                                    class="btn btn-sm btn-outline-secondary py-0 px-2 fc-edit-progress-btn"
+                                    data-action="{{ url_for('tasks.edit_progress', entry_id=pe.id) }}"
+                                    data-item-name="{{ item.name }}"
+                                    data-unit="{{ item.target_unit }}"
+                                    data-qty="{{ pe.quantity_completed }}"
+                                    data-mins="{{ pe.time_spent_minutes }}"
+                                    data-ts="{{ pe.entry_timestamp | local_input }}"
+                                    data-source="{{ pe.update_source }}"
+                                    data-comments="{{ pe.comments }}">
+                                Edit
+                            </button>
+                            <form method="post" action="{{ url_for('tasks.delete_progress', entry_id=pe.id) }}" class="d-inline">
+                                <button type="button" class="btn btn-sm btn-outline-danger py-0 px-2"
+                                        data-confirm-title="Delete Progress Entry"
+                                        data-confirm-message="Delete this progress entry? Totals and task completion status will recalculate accordingly."
+                                        data-confirm-btn="Delete">
+                                    Delete
+                                </button>
+                            </form>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    {% else %}
+        <div class="empty-state py-4">
+            <p class="small mb-2" style="color: var(--text-muted);">No progress entries recorded yet.</p>
+            <button type="button"
+                    class="btn btn-sm btn-primary fc-open-progress-btn"
+                    data-action="{{ url_for('tasks.add_progress', item_id=item.id) }}"
+                    data-item-name="{{ item.name }}"
+                    data-unit="{{ item.target_unit }}">
+                Log First Progress Entry
+            </button>
+        </div>
+    {% endif %}
+</div>
+
+<!-- Status History -->
+<div class="fc-card p-3">
+    <h2 class="h6 fw-bold mb-3">Status Transition History</h2>
+    {% if item.status_history %}
+        <div class="table-responsive">
+            <table class="table table-sm align-middle small mb-0">
+                <thead><tr><th>Timestamp</th><th>Transition</th><th>Reason</th></tr></thead>
+                <tbody>
+                    {% for h in item.status_history %}
+                    <tr>
+                        <td class="text-nowrap" style="color: var(--text-muted);">{{ h.changed_at | local_dt }}</td>
+                        <td>{{ h.from_status or 'New' }} &rarr; <strong>{{ h.to_status }}</strong></td>
+                        <td>{{ h.reason }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    {% else %}
+        <div class="small" style="color: var(--text-muted);">No status changes logged.</div>
+    {% endif %}
+</div>
+{% endblock %}
+
+{% block extra_modals %}
+{% include "tasks/_progress_modal.html" %}
+
+<div class="modal fade" id="reopen-item-modal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <form method="post" action="{{ url_for('tasks.reopen_item', item_id=item.id) }}">
+                <div class="modal-header">
+                    <h5 class="modal-title fw-bold">Reopen Completed Task</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <p class="small" style="color: var(--text-muted);">
+                        All existing progress entries are preserved and this reopen action will be recorded in the task status history.
+                    </p>
+                    <div class="mb-3">
+                        <label class="form-label small fw-semibold">Reason for Reopening</label>
+                        <input type="text" name="reason" class="form-control" value="Continuing work / expanded scope" required maxlength="300">
+                    </div>
+                    <div class="mb-0">
+                        <label class="form-label small fw-semibold">Updated Target Quantity (optional, current: {{ item.target_quantity }} {{ item.target_unit }})</label>
+                        <input type="number" step="0.01" min="0" name="new_target_quantity" class="form-control" placeholder="Leave blank to keep {{ item.target_quantity }}">
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-outline-secondary btn-sm" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-warning btn-sm">Confirm Reopen</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="{{ url_for('static', filename='js/tasks.js') }}"></script>
+{% endblock %}

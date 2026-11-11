@@ -1,0 +1,466 @@
+{% extends "base.html" %}
+{% block title %}{{ challenge.name }} — Urge &amp; Resistance Tracker{% endblock %}
+{% block breadcrumbs %}
+    <li class="breadcrumb-item"><a href="{{ url_for('challenges.index') }}" class="text-decoration-none">Urge &amp; Resistance</a></li>
+    <li class="breadcrumb-item active">{{ challenge.name }}</li>
+{% endblock %}
+{% block topbar_actions %}
+    <a href="{{ url_for('challenges.daily_tracking', challenge_id=challenge.id) }}" class="btn btn-sm btn-outline-secondary">Daily Tracking</a>
+    <a href="{{ url_for('challenges.edit', challenge_id=challenge.id) }}" class="btn btn-sm btn-outline-secondary">Customize</a>
+    <button type="button"
+            class="btn btn-sm text-white fc-open-event-btn"
+            style="background: {{ challenge.accent_color | default('#0D9488') }};"
+            data-action="{{ url_for('challenges.record_event', challenge_id=challenge.id) }}"
+            data-type="URGE"
+            data-outcome="Resisted">
+        + Detailed Event
+    </button>
+{% endblock %}
+
+{% block content %}
+<div class="layout-{{ challenge.layout_style | default('comfortable') }}">
+<div class="challenge-workspace-grid">
+
+    <!-- Custom Challenge Banner -->
+    <div class="custom-workspace-banner card-style-{{ challenge.card_style | default('elevated') }} mb-4"
+         style="font-family: '{{ challenge.font_family | default('Inter') }}', sans-serif; font-size: {{ challenge.font_size | default('16px') }}; border-top: 4px solid {{ challenge.accent_color | default('#0D9488') }}; {% if challenge.background_image %}background-image: url('{{ url_for('static', filename=challenge.background_image) }}');{% endif %}">
+        <div class="custom-workspace-scrim p-4" style="{% if challenge.text_color %}color: {{ challenge.text_color }};{% endif %}">
+            <div class="d-flex flex-wrap justify-content-between align-items-start gap-3">
+                <div>
+                    <div class="d-flex align-items-center gap-2 flex-wrap mb-1">
+                        <h1 class="h3 fw-bold mb-0">{{ challenge.name }}</h1>
+                        <span class="status-pill status-{{ challenge.status | lower | replace(' ', '-') }}">{{ challenge.status }}</span>
+                        <span class="badge bg-secondary-subtle text-secondary-emphasis">Cycle #{{ challenge.current_cycle_number | default(1) }}</span>
+                        {% if challenge.is_demo %}<span class="badge-demo">DEMO</span>{% endif %}
+                    </div>
+                    <div class="small fw-semibold mb-1" style="color: {{ challenge.accent_color | default('#0D9488') }};">
+                        Avoid: {{ challenge.behaviour_to_avoid }}
+                    </div>
+                    {% if challenge.objective %}
+                        <div class="small mb-1">Objective: {{ challenge.objective }}</div>
+                    {% endif %}
+                    {% if challenge.planned_duration_days or challenge.target_value %}
+                        <div class="d-flex flex-wrap gap-2 small mt-1 mb-1">
+                            {% if challenge.planned_duration_days %}
+                                <span class="badge bg-info-subtle text-info-emphasis">Planned: {{ challenge.planned_duration_days }} day{{ 's' if challenge.planned_duration_days != 1 else '' }}</span>
+                            {% endif %}
+                            {% if challenge.target_value %}
+                                <span class="badge bg-success-subtle text-success-emphasis">Goal: {{ challenge.target_value }} {{ challenge.target_unit or 'units' }}</span>
+                            {% endif %}
+                        </div>
+                    {% endif %}
+                    {% if challenge.description %}
+                        <p class="small mb-2" style="color: var(--text-muted);">{{ challenge.description }}</p>
+                    {% endif %}
+                    {% if challenge.metadata %}
+                        <div class="d-flex flex-wrap gap-2 mt-2">
+                            {% for mk, mv in challenge.metadata.items() %}
+                                <span class="badge bg-light text-dark border small">{{ mk }}: {{ mv }}</span>
+                            {% endfor %}
+                        </div>
+                    {% endif %}
+                </div>
+
+                <div class="d-flex flex-wrap gap-1 justify-content-end">
+                    {% if challenge.status == 'Not Started' %}
+                        <form method="post" action="{{ url_for('challenges.start', challenge_id=challenge.id) }}">
+                            <button type="submit" class="btn btn-sm btn-success">Start Challenge</button>
+                        </form>
+                    {% elif challenge.status == 'Active' %}
+                        <form method="post" action="{{ url_for('challenges.pause', challenge_id=challenge.id) }}">
+                            <button type="submit" class="btn btn-sm btn-warning">Pause Challenge</button>
+                        </form>
+                    {% elif challenge.status == 'Paused' %}
+                        <form method="post" action="{{ url_for('challenges.resume', challenge_id=challenge.id) }}">
+                            <button type="submit" class="btn btn-sm btn-success">Resume Challenge</button>
+                        </form>
+                    {% endif %}
+
+                    {% if challenge.status != 'Archived' %}
+                        <button type="button" class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#reset-cycle-modal">
+                            Reset Challenge
+                        </button>
+                    {% endif %}
+
+                    {% if challenge.status not in ['Completed', 'Archived'] %}
+                        <form method="post" action="{{ url_for('challenges.complete', challenge_id=challenge.id) }}">
+                            <button type="submit" class="btn btn-sm btn-outline-success">Complete Challenge</button>
+                        </form>
+                    {% endif %}
+
+                    <form method="post" action="{{ url_for('challenges.archive', challenge_id=challenge.id) }}">
+                        {% if challenge.status == 'Archived' %}
+                            <input type="hidden" name="unarchive" value="1">
+                            <button type="submit" class="btn btn-sm btn-outline-secondary">Unarchive</button>
+                        {% else %}
+                            <button type="submit" class="btn btn-sm btn-outline-secondary">Archive</button>
+                        {% endif %}
+                    </form>
+
+                    <form method="post" action="{{ url_for('challenges.delete', challenge_id=challenge.id) }}">
+                        <button type="button" class="btn btn-sm btn-outline-danger"
+                                data-confirm-title="Move Challenge to Trash"
+                                data-confirm-message="Move '{{ challenge.name }}' and all its cycles/events to Trash? You can restore them or permanently purge them in Settings > Trash."
+                                data-confirm-btn="Move to Trash"
+                                data-confirm-input-name="confirm_force"
+                                data-confirm-input-value="1">
+                            Delete
+                        </button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Quick Event Capture Console -->
+    {% if challenge.status != 'Archived' %}
+    <div class="fc-card card-style-{{ challenge.card_style | default('elevated') }} p-3 mb-4">
+        <div class="d-flex flex-wrap justify-content-between align-items-center gap-3">
+            <div>
+                <div class="fw-bold small">Quick Event Capture</div>
+                <div class="small" style="color: var(--text-muted);">Log thoughts, urges, outcomes, and actions immediately without mixing categories.</div>
+            </div>
+            <div class="d-flex flex-wrap gap-2">
+                <form method="post" action="{{ url_for('challenges.record_event', challenge_id=challenge.id) }}" class="d-inline">
+                    <input type="hidden" name="event_type" value="THOUGHT">
+                    <button type="submit" class="btn btn-sm btn-thought fw-semibold">Record Thought</button>
+                </form>
+                <form method="post" action="{{ url_for('challenges.record_event', challenge_id=challenge.id) }}" class="d-inline">
+                    <input type="hidden" name="event_type" value="URGE">
+                    <input type="hidden" name="outcome" value="Pending">
+                    <button type="submit" class="btn btn-sm btn-urge fw-semibold">Record Urge</button>
+                </form>
+                <form method="post" action="{{ url_for('challenges.record_event', challenge_id=challenge.id) }}" class="d-inline">
+                    <input type="hidden" name="event_type" value="URGE">
+                    <input type="hidden" name="outcome" value="Resisted">
+                    <button type="submit" class="btn btn-sm btn-resisted fw-semibold">Resisted</button>
+                </form>
+                <form method="post" action="{{ url_for('challenges.record_event', challenge_id=challenge.id) }}" class="d-inline">
+                    <input type="hidden" name="event_type" value="URGE">
+                    <input type="hidden" name="outcome" value="Gave In">
+                    <button type="submit" class="btn btn-sm btn-gavein fw-semibold">Gave In</button>
+                </form>
+                <form method="post" action="{{ url_for('challenges.record_event', challenge_id=challenge.id) }}" class="d-inline">
+                    <input type="hidden" name="event_type" value="ACTION">
+                    <button type="submit" class="btn btn-sm btn-action fw-semibold">Record Action</button>
+                </form>
+                <button type="button"
+                        class="btn btn-sm btn-outline-secondary fc-open-event-btn"
+                        data-action="{{ url_for('challenges.record_event', challenge_id=challenge.id) }}"
+                        data-type="URGE"
+                        data-outcome="Resisted">
+                    + With Details
+                </button>
+            </div>
+        </div>
+
+        {% if challenge.pending_urge_list %}
+        <div class="mt-3 pt-3 border-top" style="border-color: var(--border-color) !important;">
+            <div class="small fw-semibold text-warning mb-2">Pending Urges ({{ challenge.pending_urge_list | length }}) — Excluded from Resistance Rate until resolved:</div>
+            <div class="d-flex flex-wrap gap-2">
+                {% for pu in challenge.pending_urge_list[:6] %}
+                <div class="d-inline-flex align-items-center gap-2 px-2 py-1 rounded-3 border small" style="border-color: var(--border-color) !important;">
+                    <span>{{ pu.event_timestamp | local_dt('%b %d %I:%M %p') }}</span>
+                    <form method="post" action="{{ url_for('challenges.resolve_event', event_id=pu.id) }}" class="d-inline">
+                        <input type="hidden" name="outcome" value="Resisted">
+                        <button type="submit" class="btn btn-sm btn-resisted py-0 px-2" style="font-size: 0.72rem;">Resisted</button>
+                    </form>
+                    <form method="post" action="{{ url_for('challenges.resolve_event', event_id=pu.id) }}" class="d-inline">
+                        <input type="hidden" name="outcome" value="Gave In">
+                        <button type="submit" class="btn btn-sm btn-gavein py-0 px-2" style="font-size: 0.72rem;">Gave In</button>
+                    </form>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+        {% endif %}
+    </div>
+    {% endif %}
+
+    <!-- Cycle & Date Range Filter Bar -->
+    <div class="fc-card p-3 mb-4">
+        <form method="get" action="{{ url_for('challenges.details', challenge_id=challenge.id) }}" class="row g-2 align-items-end small">
+            <div class="col-md-3">
+                <label class="form-label fw-semibold mb-1">Challenge Cycle</label>
+                <select name="cycle_id" class="form-select form-select-sm">
+                    <option value="all" {% if cycle_filter == 'all' %}selected{% endif %}>All Cycles Combined</option>
+                    {% for cyc in challenge.cycles %}
+                        <option value="{{ cyc.id }}" {% if challenge.selected_cycle_id == cyc.id and cycle_filter != 'all' %}selected{% endif %}>
+                            Cycle #{{ cyc.cycle_number }} ({{ cyc.status }})
+                        </option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-md-3">
+                <label class="form-label fw-semibold mb-1">From Date</label>
+                <input type="date" name="start_date" class="form-control form-control-sm" value="{{ start_date }}">
+            </div>
+            <div class="col-md-3">
+                <label class="form-label fw-semibold mb-1">To Date</label>
+                <input type="date" name="end_date" class="form-control form-control-sm" value="{{ end_date }}">
+            </div>
+            <div class="col-md-3 d-flex gap-2">
+                <button type="submit" class="btn btn-sm btn-primary flex-grow-1">Apply Filter</button>
+                <a href="{{ url_for('challenges.details', challenge_id=challenge.id) }}" class="btn btn-sm btn-outline-secondary">Reset</a>
+            </div>
+        </form>
+    </div>
+
+    <!-- Separated Metrics KPI Strip -->
+    <div class="row g-3 mb-4">
+        <div class="col-6 col-md-4 col-xl-2">
+            <div class="fc-card kpi-card h-100">
+                <div class="kpi-label">Resistance Rate</div>
+                <div class="kpi-value tabular-nums mt-1" style="color: {{ challenge.accent_color | default('#0D9488') }};">{{ challenge.metrics.resistance_rate_display }}</div>
+                <div class="small" style="color: var(--text-muted); font-size: 0.72rem;">Excludes Pending</div>
+            </div>
+        </div>
+        <div class="col-6 col-md-4 col-xl-2">
+            <div class="fc-card kpi-card h-100">
+                <div class="kpi-label">Total Thoughts</div>
+                <div class="kpi-value tabular-nums mt-1">{{ challenge.metrics.total_thoughts }}</div>
+            </div>
+        </div>
+        <div class="col-6 col-md-4 col-xl-2">
+            <div class="fc-card kpi-card h-100">
+                <div class="kpi-label">Total Urges</div>
+                <div class="kpi-value tabular-nums mt-1">{{ challenge.metrics.total_urges }}</div>
+                <div class="small" style="color: var(--text-muted); font-size: 0.72rem;">{{ challenge.metrics.pending_urges }} pending</div>
+            </div>
+        </div>
+        <div class="col-6 col-md-4 col-xl-2">
+            <div class="fc-card kpi-card h-100">
+                <div class="kpi-label">Resisted Urges</div>
+                <div class="kpi-value tabular-nums mt-1 text-success">{{ challenge.metrics.resisted_urges }}</div>
+            </div>
+        </div>
+        <div class="col-6 col-md-4 col-xl-2">
+            <div class="fc-card kpi-card h-100">
+                <div class="kpi-label">Gave-In Urges</div>
+                <div class="kpi-value tabular-nums mt-1 text-danger">{{ challenge.metrics.gave_in_urges }}</div>
+            </div>
+        </div>
+        <div class="col-6 col-md-4 col-xl-2">
+            <div class="fc-card kpi-card h-100">
+                <div class="kpi-label">Actual Actions</div>
+                <div class="kpi-value tabular-nums mt-1">{{ challenge.metrics.total_actions }}</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Charts -->
+    <div class="row g-3 mb-4">
+        <div class="col-lg-6">
+            <div class="fc-card p-3 h-100">
+                <h2 class="h6 fw-bold mb-3">Daily Event Frequency</h2>
+                {% if challenge.analytics.daily_series %}
+                    <div style="height: 240px;"><canvas id="chDailyChart"></canvas></div>
+                {% else %}
+                    <div class="empty-state py-4"><div class="small" style="color: var(--text-muted);">No events in selected filter.</div></div>
+                {% endif %}
+            </div>
+        </div>
+        <div class="col-lg-6">
+            <div class="fc-card p-3 h-100">
+                <h2 class="h6 fw-bold mb-3">Time-of-Day Distribution (24h Local)</h2>
+                {% if challenge.events %}
+                    <div style="height: 240px;"><canvas id="chHourlyChart"></canvas></div>
+                {% else %}
+                    <div class="empty-state py-4"><div class="small" style="color: var(--text-muted);">Record events to see vulnerable hours.</div></div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <!-- Top Triggers & Cycle Comparison -->
+    <div class="row g-3 mb-4">
+        <div class="col-lg-5">
+            <div class="fc-card p-3 h-100">
+                <h2 class="h6 fw-bold mb-3">Trigger Analytics &amp; Breakdown</h2>
+                {% if challenge.trigger_analytics and challenge.trigger_analytics.categories %}
+                    <div class="table-responsive mb-3">
+                        <table class="table table-sm align-middle small mb-0">
+                            <thead>
+                                <tr>
+                                    <th>Category</th>
+                                    <th>Total</th>
+                                    <th>Urges (R/G/P)</th>
+                                    <th>Actions</th>
+                                    <th>Resist Rate</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for cat in challenge.trigger_analytics.categories %}
+                                <tr>
+                                    <td class="fw-semibold">{{ cat.trigger }}</td>
+                                    <td class="tabular-nums">{{ cat.total }}</td>
+                                    <td class="tabular-nums">{{ cat.resisted }} / {{ cat.gave_in }} / {{ cat.pending }}</td>
+                                    <td class="tabular-nums">{{ cat.actions }}</td>
+                                    <td class="tabular-nums fw-semibold">{{ cat.resistance_rate_display }}</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                    {% if challenge.trigger_analytics.top_custom_texts %}
+                        <div class="small fw-semibold mb-1" style="color: var(--text-muted);">Frequent Trigger Notes:</div>
+                        <div class="d-flex flex-wrap gap-1">
+                            {% for tr in challenge.trigger_analytics.top_custom_texts[:6] %}
+                                <span class="badge bg-secondary-subtle text-secondary-emphasis">{{ tr.trigger }} ({{ tr.count }})</span>
+                            {% endfor %}
+                        </div>
+                    {% endif %}
+                {% else %}
+                    <div class="small" style="color: var(--text-muted);">Select trigger categories or notes when logging events to discover patterns and resistance rates per trigger.</div>
+                {% endif %}
+            </div>
+        </div>
+
+        <div class="col-lg-7">
+            <div class="fc-card p-3 h-100">
+                <h2 class="h6 fw-bold mb-3">Challenge Cycle Comparison (Historical Preserved)</h2>
+                <div class="table-responsive">
+                    <table class="table table-sm align-middle small mb-0">
+                        <thead>
+                            <tr><th>Cycle</th><th>Status</th><th>Started</th><th>Thoughts</th><th>Resisted/Urges</th><th>Resist Rate</th><th>Actions</th></tr>
+                        </thead>
+                        <tbody>
+                            {% for cyc in challenge.cycles %}
+                            <tr>
+                                <td class="fw-semibold">Cycle #{{ cyc.cycle_number }}</td>
+                                <td><span class="badge bg-secondary-subtle text-secondary-emphasis">{{ cyc.status }}</span></td>
+                                <td class="text-nowrap" style="color: var(--text-muted);">{{ cyc.started_at | local_date }}</td>
+                                <td class="tabular-nums">{{ cyc.metrics.total_thoughts }}</td>
+                                <td class="tabular-nums">{{ cyc.metrics.resisted_urges }} / {{ cyc.metrics.total_urges }}</td>
+                                <td class="tabular-nums fw-bold">{{ cyc.metrics.resistance_rate_display }}</td>
+                                <td class="tabular-nums">{{ cyc.metrics.total_actions }}</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Event Log Table -->
+    <div class="fc-card p-3">
+        <div class="d-flex justify-content-between align-items-center mb-3">
+            <h2 class="h6 fw-bold mb-0">Individual Event Records ({{ challenge.events | length }})</h2>
+            <a href="{{ url_for('challenges.daily_tracking', challenge_id=challenge.id) }}" class="btn btn-sm btn-outline-primary">Open Daily Log &amp; Reflections</a>
+        </div>
+        {% if challenge.events %}
+            <div class="table-responsive">
+                <table class="table table-sm align-middle small mb-0">
+                    <thead>
+                        <tr>
+                            <th>Event Time</th>
+                            <th>Cycle</th>
+                            <th>Type</th>
+                            <th>Outcome</th>
+                            <th>Trigger / Context</th>
+                            <th>Duration</th>
+                            <th>Comments</th>
+                            <th class="text-end">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for ev in challenge.events %}
+                        <tr>
+                            <td class="text-nowrap">{{ ev.event_timestamp | local_dt }}</td>
+                            <td class="tabular-nums">#{{ ev.cycle_number }}</td>
+                            <td>
+                                <span class="badge {% if ev.event_type == 'THOUGHT' %}bg-primary-subtle text-primary-emphasis{% elif ev.event_type == 'URGE' %}bg-warning-subtle text-warning-emphasis{% else %}bg-danger-subtle text-danger-emphasis{% endif %}">
+                                    {{ ev.event_type }}
+                                </span>
+                            </td>
+                            <td>
+                                <span class="fw-semibold {% if ev.outcome == 'Resisted' %}text-success{% elif ev.outcome in ['Gave In', 'Occurred'] %}text-danger{% endif %}">
+                                    {{ ev.outcome }}
+                                </span>
+                                {% if ev.related_urge_id %}
+                                    <div style="font-size: 0.7rem; color: var(--text-muted);">Linked Urge #{{ ev.related_urge_id }}</div>
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if ev.trigger_category %}<span class="badge bg-secondary-subtle text-secondary-emphasis me-1">{{ ev.trigger_category }}</span>{% endif %}
+                                {% if ev.trigger_text %}<span class="fw-semibold">{{ ev.trigger_text }}</span>{% endif %}
+                                {% if ev.context %}<div style="color: var(--text-muted);">{{ ev.context }}</div>{% endif %}
+                            </td>
+                            <td class="tabular-nums">{{ ev.duration_seconds }}s</td>
+                            <td>{{ ev.comments }}</td>
+                            <td class="text-end text-nowrap">
+                                <button type="button"
+                                        class="btn btn-sm btn-outline-secondary py-0 px-2 fc-edit-event-btn"
+                                        data-action="{{ url_for('challenges.edit_event', event_id=ev.id) }}"
+                                        data-type="{{ ev.event_type }}"
+                                        data-outcome="{{ ev.outcome }}"
+                                        data-ts="{{ ev.event_timestamp | local_input }}"
+                                        data-dur="{{ ev.duration_seconds }}"
+                                        data-trigger-category="{{ ev.trigger_category }}"
+                                        data-trigger="{{ ev.trigger_text }}"
+                                        data-context="{{ ev.context }}"
+                                        data-tags="{{ ev.tags }}"
+                                        data-comments="{{ ev.comments }}"
+                                        data-related-urge="{{ ev.related_urge_id or '' }}">
+                                    Edit
+                                </button>
+                                <form method="post" action="{{ url_for('challenges.delete_event', event_id=ev.id) }}" class="d-inline">
+                                    <button type="button" class="btn btn-sm btn-outline-danger py-0 px-2"
+                                            data-confirm-title="Move Event to Trash"
+                                            data-confirm-message="Move this {{ ev.event_type }} event record to Trash? You can restore it from Settings > Trash."
+                                            data-confirm-btn="Move to Trash">
+                                        &times;
+                                    </button>
+                                </form>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        {% else %}
+            <div class="empty-state py-4"><div class="small" style="color: var(--text-muted);">No events recorded yet. Use the quick buttons above to log your first event.</div></div>
+        {% endif %}
+    </div>
+
+</div>
+</div>
+{% endblock %}
+
+{% block extra_modals %}
+{% include "challenges/_event_modal.html" %}
+
+<!-- Reset Cycle Modal -->
+<div class="modal fade" id="reset-cycle-modal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <form method="post" action="{{ url_for('challenges.reset', challenge_id=challenge.id) }}">
+                <div class="modal-header">
+                    <h5 class="modal-title fw-bold">Reset Challenge &amp; Start New Cycle</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <p class="small" style="color: var(--text-muted);">
+                        All events and daily records from <strong>Cycle #{{ challenge.current_cycle_number | default(1) }}</strong> will remain permanently preserved in history and cycle comparisons. A fresh cycle (#{{ (challenge.current_cycle_number | default(1)) + 1 }}) will begin immediately.
+                    </p>
+                    <label class="form-label small fw-semibold">Reason / Reflection for Reset (Optional)</label>
+                    <input type="text" name="reset_reason" class="form-control" maxlength="400" placeholder="e.g. Starting fresh week after slip">
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-outline-secondary btn-sm" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-primary btn-sm">Start New Cycle</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+window.CHALLENGE_CHART_DATA = {{ challenge.analytics | tojson }};
+window.CHALLENGE_ACCENT = {{ challenge.accent_color | default('#0D9488') | tojson }};
+</script>
+<script src="{{ url_for('static', filename='js/challenges.js') }}"></script>
+{% endblock %}

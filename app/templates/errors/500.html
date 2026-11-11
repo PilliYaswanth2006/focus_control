@@ -1,0 +1,11 @@
+{% extends "base.html" %}
+{% block title %}Error — Focus &amp; Control{% endblock %}
+{% block breadcrumbs %}<li class="breadcrumb-item active">Error</li>{% endblock %}
+{% block content %}
+<div class="empty-state my-4">
+    <i data-lucide="alert-triangle" class="mb-3 text-danger" style="width: 42px; height: 42px;"></i>
+    <h2 class="h5 fw-bold">Something went wrong</h2>
+    <p class="small mb-3" style="color: var(--text-muted);">{{ message | default('An unexpected error occurred.') }}</p>
+    <a href="{{ url_for('dashboard.index') }}" class="btn btn-primary btn-sm">Return to Dashboard</a>
+</div>
+{% endblock %}

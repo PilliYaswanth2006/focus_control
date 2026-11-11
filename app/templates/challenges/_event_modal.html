@@ -1,0 +1,98 @@
+<!-- Reusable Urge / Thought / Action Event Entry & Edit Modal -->
+<div class="modal fade" id="fc-event-modal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <form id="fc-event-form" method="post" action="" class="needs-validation" novalidate>
+                <div class="modal-header">
+                    <h5 class="modal-title fw-bold" id="fc-event-modal-title">Record Behavioural Event</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="row g-3 mb-3">
+                        <div class="col-sm-6">
+                            <label class="form-label small fw-semibold">Event Type *</label>
+                            <select name="event_type" id="fc-event-type" class="form-select" required>
+                                <option value="THOUGHT">THOUGHT (Mental awareness)</option>
+                                <option value="URGE">URGE (Temptation / desire)</option>
+                                <option value="ACTION">ACTION (Behaviour occurred)</option>
+                            </select>
+                        </div>
+                        <div class="col-sm-6" id="fc-outcome-wrap">
+                            <label class="form-label small fw-semibold">Urge Outcome</label>
+                            <select name="outcome" id="fc-event-outcome" class="form-select">
+                                <option value="Resisted">Resisted</option>
+                                <option value="Gave In">Gave In</option>
+                                <option value="Pending">Pending / Unknown</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="mb-3 d-none" id="fc-related-urge-wrap">
+                        <label class="form-label small fw-semibold">Link to Preceding Urge (Optional — prevents duplicate counting)</label>
+                        <select name="related_urge_id" id="fc-related-urge" class="form-select form-select-sm">
+                            <option value="">Standalone action (no prior urge logged)</option>
+                            {% set urge_candidates = challenge.linkable_urges_list if challenge and challenge.linkable_urges_list is defined else (challenge.pending_urge_list if challenge and challenge.pending_urge_list else []) %}
+                            {% for pu in urge_candidates %}
+                                <option value="{{ pu.id }}">{{ pu.outcome }} Urge #{{ pu.id }} ({{ pu.event_timestamp | local_dt }})</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+
+                    <div class="row g-3 mb-3">
+                        <div class="col-sm-7">
+                            <label class="form-label small fw-semibold">Event Timestamp (Local)</label>
+                            <input type="datetime-local" name="event_timestamp" id="fc-event-ts" class="form-control">
+                            <div class="form-text small">Blank = now (for new events). Preserved on edit unless changed.</div>
+                        </div>
+                        <div class="col-sm-5">
+                            <label class="form-label small fw-semibold">Duration (seconds)</label>
+                            <input type="number" min="0" max="86400" name="duration_seconds" id="fc-event-dur" class="form-control" value="0">
+                        </div>
+                    </div>
+
+                    <div class="row g-3 mb-3">
+                        <div class="col-sm-6">
+                            <label class="form-label small fw-semibold">Trigger Category</label>
+                            {% set trig_list = predefined_triggers if predefined_triggers is defined else (challenge.predefined_triggers if challenge and challenge.predefined_triggers is defined else []) %}
+                            <select name="trigger_category" id="fc-event-trigger-cat" class="form-select">
+                                <option value="">-- Select category --</option>
+                                {% for trig in trig_list %}
+                                    <option value="{{ trig }}">{{ trig }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="col-sm-6">
+                            <label class="form-label small fw-semibold">Specific Trigger Detail (Optional)</label>
+                            <input type="text" name="trigger_text" id="fc-event-trigger" class="form-control" maxlength="200" placeholder="e.g. Late night boredom, Buzz">
+                        </div>
+                    </div>
+
+                    <div class="row g-3 mb-3">
+                        <div class="col-sm-6">
+                            <label class="form-label small fw-semibold">Context / Location</label>
+                            <input type="text" name="context" id="fc-event-context" class="form-control" maxlength="300" placeholder="e.g. Study desk, Late night">
+                        </div>
+                        <div class="col-sm-6">
+                            <label class="form-label small fw-semibold">Tags (comma separated)</label>
+                            <input type="text" name="tags" id="fc-event-tags" class="form-control" maxlength="300" placeholder="e.g. evening, phone">
+                        </div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label small fw-semibold">Tags (comma separated)</label>
+                        <input type="text" name="tags" id="fc-event-tags" class="form-control" maxlength="300" placeholder="e.g. evening, phone">
+                    </div>
+
+                    <div class="mb-0">
+                        <label class="form-label small fw-semibold">Comments / Observations</label>
+                        <textarea name="comments" id="fc-event-comments" class="form-control" rows="2" maxlength="2000"></textarea>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-outline-secondary btn-sm" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-sm text-white" style="background: var(--urge-accent);">Save Event</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>

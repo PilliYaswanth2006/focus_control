@@ -1,0 +1,162 @@
+{% extends "base.html" %}
+{% block title %}{{ 'Edit ' + task.name if task else 'Create Centered Task' }} — Focus &amp; Control{% endblock %}
+{% block breadcrumbs %}
+    <li class="breadcrumb-item"><a href="{{ url_for('tasks.index') }}" class="text-decoration-none">Weighted Task Manager</a></li>
+    <li class="breadcrumb-item active">{{ 'Edit Task' if task else 'New Centered Task' }}</li>
+{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-lg-9">
+        <div class="fc-card fc-card-task p-4">
+            <h1 class="h4 fw-bold mb-1">{{ 'Edit Centered Task' if task else 'Create Centered Task' }}</h1>
+            <p class="small mb-4" style="color: var(--text-muted);">Define a major responsibility area, its budget weight, schedule, and custom visual identity.</p>
+
+            <form method="post" enctype="multipart/form-data" class="needs-validation" novalidate>
+                <div class="row g-3 mb-3">
+                    <div class="col-md-8">
+                        <label class="form-label small fw-semibold">Task Name *</label>
+                        <input type="text" name="name" class="form-control" value="{{ task.name if task else '' }}" required maxlength="140" placeholder="e.g. Machine Learning">
+                        <div class="invalid-feedback">Task name is required.</div>
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label small fw-semibold">Priority</label>
+                        <select name="priority" class="form-select">
+                            {% for p in priorities %}
+                                <option value="{{ p }}" {% if (task and task.priority == p) or (not task and p == 'Medium') %}selected{% endif %}>{{ p }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                </div>
+
+                <div class="mb-3">
+                    <label class="form-label small fw-semibold">Description</label>
+                    <textarea name="description" class="form-control" rows="2" maxlength="2000">{{ task.description if task else '' }}</textarea>
+                </div>
+
+                <div class="row g-3 mb-3">
+                    <div class="col-md-3 col-sm-6">
+                        <label class="form-label small fw-semibold">Weight (%)</label>
+                        <input type="number" step="0.1" min="0" max="100" name="weight" class="form-control" value="{{ task.weight if task else 0 }}" required>
+                        <div class="form-text small">Budgeted unallocated: {{ budget.remaining_unallocated_weight }}%</div>
+                    </div>
+                    <div class="col-md-3 col-sm-6">
+                        <label class="form-label small fw-semibold">Allocation Mode</label>
+                        <select name="allocation_mode" id="ct-alloc-mode" class="form-select">
+                            <option value="budgeted" {% if not task or task.allocation_mode == 'budgeted' %}selected{% endif %}>Budgeted ({{ budget.total_budget }} {{ budget.budget_unit }})</option>
+                            <option value="manual" {% if task and task.allocation_mode == 'manual' %}selected{% endif %}>Manual Target</option>
+                        </select>
+                    </div>
+                    <div class="col-md-3 col-sm-6" id="ct-manual-target-wrap">
+                        <label class="form-label small fw-semibold">Target Allocation</label>
+                        <input type="number" step="0.1" min="0" name="target_allocation" class="form-control" value="{{ task.target_allocation if task else 0 }}">
+                    </div>
+                    <div class="col-md-3 col-sm-6" id="ct-unit-wrap">
+                        <label class="form-label small fw-semibold">Target Unit</label>
+                        <input type="text" name="target_unit" class="form-control" value="{{ task.target_unit if task else budget.budget_unit }}" maxlength="30">
+                    </div>
+                </div>
+
+                <div class="row g-3 mb-4">
+                    <div class="col-md-4">
+                        <label class="form-label small fw-semibold">Start Date</label>
+                        <input type="date" name="start_date" class="form-control" value="{{ task.start_date if task else '' }}">
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label small fw-semibold">Target End Date</label>
+                        <input type="date" name="target_end_date" class="form-control" value="{{ task.target_end_date if task else '' }}">
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label small fw-semibold">Status</label>
+                        <select name="status" class="form-select">
+                            {% for s in statuses %}
+                                <option value="{{ s }}" {% if (task and task.status == s) or (not task and s == 'Active') %}selected{% endif %}>{{ s }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                </div>
+
+                <hr class="my-4" style="border-color: var(--border-color);">
+                <h2 class="h6 fw-bold mb-3">Visual Customization &amp; Metadata</h2>
+
+                <div class="row g-3 mb-3">
+                    <div class="col-md-4">
+                        <label class="form-label small fw-semibold">Font Family</label>
+                        <select name="font_family" class="form-select">
+                            {% for f in fonts %}
+                                <option value="{{ f }}" {% if task and task.font_family == f %}selected{% endif %}>{{ f }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="col-md-2 col-4">
+                        <label class="form-label small fw-semibold">Primary Color</label>
+                        <input type="color" name="primary_color" class="form-control form-control-color w-100" value="{{ task.primary_color if task else '#4F46E5' }}">
+                    </div>
+                    <div class="col-md-2 col-4">
+                        <label class="form-label small fw-semibold">Accent Color</label>
+                        <input type="color" name="accent_color" class="form-control form-control-color w-100" value="{{ task.accent_color if task else '#0EA5E9' }}">
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label small fw-semibold">Preset Background</label>
+                        <select name="background_preset" id="ct-bg-preset" class="form-select">
+                            {% if task and task.background_image %}
+                                <option value="__keep__" data-preview-url="{{ url_for('static', filename=task.background_image) }}" selected>Keep current background</option>
+                            {% endif %}
+                            {% for p in presets %}
+                                <option value="{{ p.id }}" data-preview-url="{{ url_for('static', filename=p.path) if p.path else '' }}">{{ p.label }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                </div>
+
+                <div class="row g-3 mb-4 align-items-center">
+                    <div class="col-md-7">
+                        <label class="form-label small fw-semibold">Or Upload Custom Background Image (PNG/JPG/WEBP, max 5 MB)</label>
+                        <input type="file" name="background_file" id="ct-bg-file" class="form-control" accept=".png,.jpg,.jpeg,.webp">
+                    </div>
+                    <div class="col-md-5">
+                        <label class="form-label small fw-semibold d-block">Background Preview</label>
+                        <div id="ct-bg-preview" class="rounded-3 border d-flex align-items-center justify-content-center small"
+                             style="height: 64px; border-color: var(--border-color) !important; background-size: cover; background-position: center; background-color: var(--bg-subtle); color: var(--text-muted);{% if task and task.background_image %} background-image: url('{{ url_for('static', filename=task.background_image) }}');{% endif %}">
+                            <span id="ct-bg-preview-label">{% if task and task.background_image %}{% else %}No background selected{% endif %}</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="mb-4">
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                        <label class="form-label small fw-semibold mb-0">Additional Metadata (Key / Value)</label>
+                        <button type="button" class="btn btn-sm btn-outline-secondary py-0 px-2" id="add-meta-row">+ Add Field</button>
+                    </div>
+                    <div id="meta-kv-container" class="d-flex flex-column gap-2">
+                        {% if task and task.metadata %}
+                            {% for mk, mv in task.metadata.items() %}
+                                <div class="row g-2 meta-kv-row">
+                                    <div class="col-5"><input type="text" name="meta_key" class="form-control form-control-sm" value="{{ mk }}" placeholder="Key"></div>
+                                    <div class="col-6"><input type="text" name="meta_value" class="form-control form-control-sm" value="{{ mv }}" placeholder="Value"></div>
+                                    <div class="col-1"><button type="button" class="btn btn-sm btn-outline-danger w-100 remove-meta-row">&times;</button></div>
+                                </div>
+                            {% endfor %}
+                        {% else %}
+                            <div class="row g-2 meta-kv-row">
+                                <div class="col-5"><input type="text" name="meta_key" class="form-control form-control-sm" placeholder="e.g. Mentor / Quarter"></div>
+                                <div class="col-6"><input type="text" name="meta_value" class="form-control form-control-sm" placeholder="e.g. Q4 Focus"></div>
+                                <div class="col-1"><button type="button" class="btn btn-sm btn-outline-danger w-100 remove-meta-row">&times;</button></div>
+                            </div>
+                        {% endif %}
+                    </div>
+                </div>
+
+                <div class="d-flex justify-content-end gap-2">
+                    <a href="{{ url_for('tasks.details', task_id=task.id) if task else url_for('tasks.index') }}" class="btn btn-outline-secondary">Cancel</a>
+                    <button type="submit" class="btn btn-primary px-4">{{ 'Save Changes' if task else 'Create Centered Task' }}</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="{{ url_for('static', filename='js/tasks.js') }}"></script>
+{% endblock %}

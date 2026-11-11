@@ -1,0 +1,11 @@
+{% extends "base.html" %}
+{% block title %}Page Not Found — Focus &amp; Control{% endblock %}
+{% block breadcrumbs %}<li class="breadcrumb-item active">404</li>{% endblock %}
+{% block content %}
+<div class="empty-state my-4">
+    <i data-lucide="search-x" class="mb-3" style="width: 42px; height: 42px; color: var(--text-muted);"></i>
+    <h2 class="h5 fw-bold">Page Not Found</h2>
+    <p class="small mb-3" style="color: var(--text-muted);">The requested page or resource could not be found.</p>
+    <a href="{{ url_for('dashboard.index') }}" class="btn btn-primary btn-sm">Return to Dashboard</a>
+</div>
+{% endblock %}

@@ -1,0 +1,234 @@
+{% extends "base.html" %}
+{% block title %}Monthly Calendar — Focus &amp; Control{% endblock %}
+{% block breadcrumbs %}<li class="breadcrumb-item active">Monthly Calendar</li>{% endblock %}
+
+{% block content %}
+<div id="fc-calendar-root"
+     data-month="{{ cal.month }}"
+     data-module="{{ cal.module_filter }}"
+     data-include-demo="{{ 1 if cal.include_demo else 0 }}">
+
+    <div class="d-flex flex-wrap justify-content-between align-items-end gap-3 mb-4">
+        <div>
+            <h1 class="h4 fw-bold mb-1">Monthly Productivity &amp; Urge Calendar</h1>
+            <p class="small mb-0" style="color: var(--text-muted);">Inspect daily task focus, completions, behavioural urges, and reflections across {{ cal.month_label }}.</p>
+        </div>
+
+        <div class="d-flex flex-wrap align-items-center gap-2">
+            <a href="{{ url_for('calendar.index', month=cal.prev_month, module=cal.module_filter, include_demo=(1 if cal.include_demo else 0)) }}"
+               class="btn btn-sm btn-outline-secondary">&larr; Prev</a>
+            <form method="get" action="{{ url_for('calendar.index') }}" class="d-flex flex-wrap align-items-center gap-2">
+                <input type="month" name="month" value="{{ cal.month }}" class="form-control form-control-sm" onchange="this.form.submit()">
+                <select name="module" class="form-select form-select-sm" style="width: auto;" onchange="this.form.submit()">
+                    <option value="all" {% if cal.module_filter == 'all' %}selected{% endif %}>All Modules</option>
+                    <option value="tasks" {% if cal.module_filter == 'tasks' %}selected{% endif %}>Tasks Only</option>
+                    <option value="challenges" {% if cal.module_filter == 'challenges' %}selected{% endif %}>Urges &amp; Challenges Only</option>
+                </select>
+                {% if has_demo %}
+                <select name="include_demo" class="form-select form-select-sm" style="width: auto;" onchange="this.form.submit()">
+                    <option value="1" {% if cal.include_demo %}selected{% endif %}>Include Demo</option>
+                    <option value="0" {% if not cal.include_demo %}selected{% endif %}>Personal Only</option>
+                </select>
+                {% endif %}
+                <noscript><button type="submit" class="btn btn-sm btn-primary">Load</button></noscript>
+            </form>
+            <a href="{{ url_for('calendar.index', month=cal.next_month, module=cal.module_filter, include_demo=(1 if cal.include_demo else 0)) }}"
+               class="btn btn-sm btn-outline-secondary">Next &rarr;</a>
+            <a href="{{ url_for('calendar.index', date=cal.today, module=cal.module_filter, include_demo=(1 if cal.include_demo else 0)) }}"
+               class="btn btn-sm btn-outline-primary">Today</a>
+        </div>
+    </div>
+
+    <!-- Monthly Summary KPI Strip -->
+    <div class="row g-3 row-cols-2 row-cols-md-3 row-cols-xl-6 mb-4">
+        <div class="col">
+            <div class="fc-card kpi-card h-100">
+                <div class="kpi-label">Active Days</div>
+                <div class="kpi-value tabular-nums mt-1">{{ cal.summary.active_days }}</div>
+            </div>
+        </div>
+        <div class="col">
+            <div class="fc-card kpi-card h-100">
+                <div class="kpi-label">Task Hours</div>
+                <div class="kpi-value tabular-nums mt-1" style="color: var(--task-accent);">{{ cal.summary.task_hours }} <span class="fs-6 fw-normal" style="color: var(--text-muted);">hrs</span></div>
+            </div>
+        </div>
+        <div class="col">
+            <div class="fc-card kpi-card h-100">
+                <div class="kpi-label">Completed</div>
+                <div class="kpi-value tabular-nums mt-1 text-success">{{ cal.summary.completed_count }}</div>
+            </div>
+        </div>
+        <div class="col">
+            <div class="fc-card kpi-card h-100">
+                <div class="kpi-label">Total Urges</div>
+                <div class="kpi-value tabular-nums mt-1">{{ cal.summary.total_urges }}</div>
+            </div>
+        </div>
+        <div class="col">
+            <div class="fc-card kpi-card h-100">
+                <div class="kpi-label">Resisted / Slips</div>
+                <div class="kpi-value tabular-nums mt-1"><span class="text-success">{{ cal.summary.resisted_urges }}</span> / <span class="text-danger">{{ cal.summary.gave_in_urges }}</span></div>
+            </div>
+        </div>
+        <div class="col">
+            <div class="fc-card kpi-card h-100">
+                <div class="kpi-label">Notes &amp; Reflections</div>
+                <div class="kpi-value tabular-nums mt-1">{{ cal.summary.reflections_count }}</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Calendar Grid + Selected Day Inspector -->
+    <div class="row g-4">
+        <div class="col-xl-8">
+            <div class="fc-card p-3">
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                    <h2 class="h6 fw-bold mb-0">{{ cal.month_label }}</h2>
+                    <div class="d-flex flex-wrap gap-2 small" style="color: var(--text-muted);">
+                        <span><span class="calendar-badge bg-primary-subtle text-primary-emphasis">hrs</span> Task Focus</span>
+                        <span><span class="calendar-badge bg-success-subtle text-success-emphasis">R</span> Resisted</span>
+                        <span><span class="calendar-badge bg-danger-subtle text-danger-emphasis">G</span> Gave In</span>
+                    </div>
+                </div>
+
+                <div class="calendar-weekdays small">
+                    {% for wd in ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'] %}
+                        <div class="calendar-weekday">{{ wd }}</div>
+                    {% endfor %}
+                </div>
+
+                <div class="calendar-grid">
+                    {% for week in cal.weeks %}
+                        {% for d in week %}
+                        <button type="button"
+                                class="calendar-day {% if not d.in_month %}outside-month{% endif %} {% if d.is_today %}is-today{% endif %} {% if d.date == cal.selected_date %}active{% endif %}"
+                                data-date="{{ d.date }}">
+                            <div class="d-flex justify-content-between align-items-center w-100 mb-1">
+                                <span class="fw-bold small tabular-nums">{{ d.day_num }}</span>
+                                {% if d.is_today %}<span class="badge bg-warning-subtle text-warning-emphasis" style="font-size: 0.62rem;">Today</span>{% endif %}
+                            </div>
+                            <div class="d-flex flex-wrap gap-1" style="font-size: 0.68rem;">
+                                {% if d.task_hours > 0 %}
+                                    <span class="calendar-badge bg-primary-subtle text-primary-emphasis tabular-nums">{{ d.task_hours }}h</span>
+                                {% endif %}
+                                {% if d.completed_count > 0 %}
+                                    <span class="calendar-badge bg-info-subtle text-info-emphasis tabular-nums">&check;{{ d.completed_count }}</span>
+                                {% endif %}
+                                {% if d.resisted > 0 %}
+                                    <span class="calendar-badge bg-success-subtle text-success-emphasis tabular-nums">{{ d.resisted }}R</span>
+                                {% endif %}
+                                {% if d.gave_in > 0 or d.actions > 0 %}
+                                    <span class="calendar-badge bg-danger-subtle text-danger-emphasis tabular-nums">{{ d.gave_in + d.actions }}G</span>
+                                {% endif %}
+                                {% if d.thoughts > 0 %}
+                                    <span class="calendar-badge bg-secondary-subtle text-secondary-emphasis tabular-nums">{{ d.thoughts }}T</span>
+                                {% endif %}
+                                {% if d.note_count > 0 %}
+                                    <span class="calendar-badge bg-secondary-subtle text-secondary-emphasis tabular-nums">{{ d.note_count }}N</span>
+                                {% endif %}
+                            </div>
+                        </button>
+                        {% endfor %}
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+
+        <div class="col-xl-4">
+            <div class="fc-card p-3 h-100" id="fc-calendar-day-panel">
+                {% set sd = cal.selected_day %}
+                <div class="d-flex justify-content-between align-items-center pb-2 mb-3 border-bottom" style="border-color: var(--border-color) !important;">
+                    <div>
+                        <h2 class="h6 fw-bold mb-0">{{ sd.date }}</h2>
+                        <div class="small" style="color: var(--text-muted);">{{ sd.total_activity }} recorded item(s)</div>
+                    </div>
+                    {% if sd.is_today %}<span class="badge bg-warning-subtle text-warning-emphasis">Today</span>{% endif %}
+                </div>
+
+                {% if sd.total_activity == 0 %}
+                    <div class="small" style="color: var(--text-muted);">No task logs, completions, urge events, or reflections recorded on {{ sd.date }}.</div>
+                {% else %}
+                    {% if sd.progress_entries %}
+                        <div class="small fw-bold mb-1">Task Progress Entries ({{ sd.progress_entries | length }})</div>
+                        <ul class="list-group list-group-flush small mb-3">
+                            {% for e in sd.progress_entries %}
+                            <li class="list-group-item bg-transparent px-0 py-1" style="border-color: var(--border-color); color: var(--text-primary);">
+                                <a href="{{ url_for('tasks.item_details', item_id=e.task_item_id) }}" class="fw-semibold text-decoration-none">{{ e.task_item_name }}</a>
+                                <span style="color: var(--text-muted);">({{ e.centered_task_name }})</span>
+                                <div class="tabular-nums" style="color: var(--text-muted);">{{ e.local_time }} · {{ e.quantity_completed }} {{ e.target_unit }} · {{ e.time_spent_minutes }} min</div>
+                            </li>
+                            {% endfor %}
+                        </ul>
+                    {% endif %}
+
+                    {% if sd.completed_items or sd.completed_centered %}
+                        <div class="small fw-bold mb-1">Completed Tasks</div>
+                        <ul class="list-group list-group-flush small mb-3">
+                            {% for ci in sd.completed_items %}
+                            <li class="list-group-item bg-transparent px-0 py-1" style="border-color: var(--border-color); color: var(--text-primary);">
+                                <a href="{{ url_for('tasks.item_details', item_id=ci.id) }}" class="fw-semibold text-decoration-none text-success">{{ ci.name }}</a>
+                                <span style="color: var(--text-muted);">({{ ci.parent_name }} · {{ ci.local_time }})</span>
+                            </li>
+                            {% endfor %}
+                            {% for cc in sd.completed_centered %}
+                            <li class="list-group-item bg-transparent px-0 py-1" style="border-color: var(--border-color); color: var(--text-primary);">
+                                <a href="{{ url_for('tasks.details', task_id=cc.id) }}" class="fw-semibold text-decoration-none text-success">{{ cc.name }}</a>
+                                <span style="color: var(--text-muted);">(Centered · {{ cc.local_time }})</span>
+                            </li>
+                            {% endfor %}
+                        </ul>
+                    {% endif %}
+
+                    {% if sd.events %}
+                        <div class="small fw-bold mb-1">Behavioural Events ({{ sd.events | length }})</div>
+                        <ul class="list-group list-group-flush small mb-3">
+                            {% for ev in sd.events %}
+                            <li class="list-group-item bg-transparent px-0 py-1" style="border-color: var(--border-color); color: var(--text-primary);">
+                                <div class="d-flex justify-content-between">
+                                    <a href="{{ url_for('challenges.details', challenge_id=ev.challenge_id) }}" class="fw-semibold text-decoration-none">{{ ev.challenge_name }}</a>
+                                    <span style="color: var(--text-muted);">{{ ev.local_time }}</span>
+                                </div>
+                                <div>
+                                    <span class="badge bg-secondary-subtle text-secondary-emphasis">{{ ev.event_type }}</span>
+                                    <span class="fw-semibold">{{ ev.outcome }}</span>
+                                    {% if ev.trigger_category or ev.trigger_text %} · {{ ev.trigger_category or ev.trigger_text }}{% endif %}
+                                </div>
+                            </li>
+                            {% endfor %}
+                        </ul>
+                    {% endif %}
+
+                    {% if sd.reflections or sd.daily_records or sd.comments %}
+                        <div class="small fw-bold mb-1">Reflections &amp; Notes</div>
+                        <ul class="list-group list-group-flush small mb-0">
+                            {% for rf in sd.reflections %}
+                            <li class="list-group-item bg-transparent px-0 py-1" style="border-color: var(--border-color); color: var(--text-primary);">
+                                <a href="{{ url_for('challenges.daily_tracking', challenge_id=rf.challenge_id, date=sd.date) }}" class="fw-semibold text-decoration-none">{{ rf.challenge_name }} — {{ rf.title or 'Reflection' }}</a>
+                                <div>{{ rf.reflection_text | truncate(120) }}</div>
+                            </li>
+                            {% endfor %}
+                            {% for rec in sd.daily_records %}
+                            <li class="list-group-item bg-transparent px-0 py-1" style="border-color: var(--border-color); color: var(--text-primary);">
+                                <a href="{{ url_for('challenges.daily_tracking', challenge_id=rec.challenge_id, date=sd.date) }}" class="fw-semibold text-decoration-none">{{ rec.challenge_name }} (Daily Summary)</a>
+                                <div>{% if rec.mood %}[{{ rec.mood }}] {% endif %}{{ rec.reflection | truncate(120) }}</div>
+                            </li>
+                            {% endfor %}
+                            {% for cm in sd.comments %}
+                            <li class="list-group-item bg-transparent px-0 py-1" style="border-color: var(--border-color); color: var(--text-primary);">
+                                <a href="{{ url_for('challenges.daily_tracking', challenge_id=cm.challenge_id, date=sd.date) }}" class="fw-semibold text-decoration-none">{{ cm.challenge_name }}</a>
+                                <div>{{ cm.comment_text | truncate(120) }}</div>
+                            </li>
+                            {% endfor %}
+                        </ul>
+                    {% endif %}
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="{{ url_for('static', filename='js/calendar.js') }}"></script>
+{% endblock %}

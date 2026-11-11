@@ -1,0 +1,383 @@
+{% extends "base.html" %}
+{% block title %}Daily Tracking — {{ data.challenge.name }}{% endblock %}
+{% block breadcrumbs %}
+    <li class="breadcrumb-item"><a href="{{ url_for('challenges.index') }}" class="text-decoration-none">Urge &amp; Resistance</a></li>
+    <li class="breadcrumb-item"><a href="{{ url_for('challenges.details', challenge_id=data.challenge.id) }}" class="text-decoration-none">{{ data.challenge.name }}</a></li>
+    <li class="breadcrumb-item active">Daily Tracking</li>
+{% endblock %}
+{% block topbar_actions %}
+    <a href="{{ url_for('challenges.details', challenge_id=data.challenge.id) }}" class="btn btn-sm btn-outline-secondary">Back to Challenge</a>
+    {% if data.challenge.status != 'Archived' %}
+        <button type="button"
+                class="btn btn-sm text-white fc-open-event-btn"
+                style="background: {{ data.challenge.accent_color | default('#0D9488') }};"
+                data-action="{{ url_for('challenges.record_event', challenge_id=data.challenge.id) }}"
+                data-type="URGE"
+                data-outcome="Resisted"
+                data-ts="{% if not data.selected_day.is_today %}{{ data.selected_date }}T12:00{% endif %}">
+            + Log Event ({{ data.selected_date }})
+        </button>
+    {% endif %}
+{% endblock %}
+
+{% block content %}
+<div class="d-flex flex-wrap justify-content-between align-items-end gap-3 mb-4">
+    <div>
+        <h1 class="h4 fw-bold mb-1">Daily Tracking: {{ data.challenge.name }}</h1>
+        <p class="small mb-0" style="color: var(--text-muted);">
+            Navigate any date to inspect chronological events, timestamped reflections, daily summaries, and comments.
+        </p>
+    </div>
+</div>
+
+<!-- Date Navigation & Active Dates Selector -->
+<div class="fc-card p-3 mb-4">
+    <div class="d-flex flex-wrap justify-content-between align-items-center gap-3">
+        <div class="d-flex flex-wrap align-items-center gap-2">
+            <a href="{{ url_for('challenges.daily_tracking', challenge_id=data.challenge.id, date=data.prev_date) }}"
+               class="btn btn-sm btn-outline-secondary">&larr; {{ data.prev_date }}</a>
+            <form method="get" action="{{ url_for('challenges.daily_tracking', challenge_id=data.challenge.id) }}" class="d-flex align-items-center gap-2">
+                <input type="date" name="date" value="{{ data.selected_date }}" class="form-control form-control-sm" onchange="this.form.submit()">
+                <button type="submit" class="btn btn-sm btn-primary">Go</button>
+            </form>
+            <a href="{{ url_for('challenges.daily_tracking', challenge_id=data.challenge.id, date=data.next_date) }}"
+               class="btn btn-sm btn-outline-secondary">{{ data.next_date }} &rarr;</a>
+            {% if data.selected_date != data.today %}
+                <a href="{{ url_for('challenges.daily_tracking', challenge_id=data.challenge.id, date=data.today) }}"
+                   class="btn btn-sm btn-outline-primary">Today ({{ data.today }})</a>
+            {% endif %}
+        </div>
+
+        {% if data.active_dates %}
+        <div class="d-flex flex-wrap align-items-center gap-1 small">
+            <span style="color: var(--text-muted);">Recorded days:</span>
+            {% for ad in data.active_dates[:8] %}
+                <a href="{{ url_for('challenges.daily_tracking', challenge_id=data.challenge.id, date=ad.date) }}"
+                   class="badge text-decoration-none {% if ad.date == data.selected_date %}bg-primary text-white{% else %}bg-secondary-subtle text-secondary-emphasis{% endif %}">
+                    {{ ad.date }}{% if ad.is_today %} (Today){% endif %}
+                </a>
+            {% endfor %}
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+<!-- SELECTED DAY WORKSPACE -->
+{% set day = data.selected_day %}
+<div class="fc-card p-4 mb-4" style="border-left: 4px solid {{ data.challenge.accent_color | default('#0D9488') }};">
+    <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+        <div class="d-flex align-items-center gap-2">
+            <h2 class="h5 fw-bold mb-0">{{ day.date }}</h2>
+            {% if day.is_today %}<span class="badge bg-primary-subtle text-primary-emphasis">Today</span>{% endif %}
+        </div>
+        <div class="d-flex flex-wrap gap-3 small tabular-nums">
+            <span>Thoughts: <strong>{{ day.metrics.total_thoughts }}</strong></span>
+            <span>Urges: <strong>{{ day.metrics.total_urges }}</strong></span>
+            <span class="text-success">Resisted: <strong>{{ day.metrics.resisted_urges }}</strong></span>
+            <span class="text-danger">Gave In: <strong>{{ day.metrics.gave_in_urges }}</strong></span>
+            <span>Actions: <strong>{{ day.metrics.total_actions }}</strong></span>
+            <span style="color: {{ data.challenge.accent_color | default('#0D9488') }};">Rate: <strong>{{ day.metrics.resistance_rate_display }}</strong></span>
+        </div>
+    </div>
+
+    {% if data.challenge.status != 'Archived' %}
+    <div class="d-flex flex-wrap gap-2 pb-3 mb-3 border-bottom" style="border-color: var(--border-color) !important;">
+        <button type="button" class="btn btn-sm btn-thought fc-open-event-btn"
+                data-action="{{ url_for('challenges.record_event', challenge_id=data.challenge.id) }}"
+                data-type="THOUGHT"
+                data-ts="{% if not day.is_today %}{{ day.date }}T12:00{% endif %}">+ Thought</button>
+        <button type="button" class="btn btn-sm btn-resisted fc-open-event-btn"
+                data-action="{{ url_for('challenges.record_event', challenge_id=data.challenge.id) }}"
+                data-type="URGE" data-outcome="Resisted"
+                data-ts="{% if not day.is_today %}{{ day.date }}T12:00{% endif %}">+ Resisted Urge</button>
+        <button type="button" class="btn btn-sm btn-urge fc-open-event-btn"
+                data-action="{{ url_for('challenges.record_event', challenge_id=data.challenge.id) }}"
+                data-type="URGE" data-outcome="Pending"
+                data-ts="{% if not day.is_today %}{{ day.date }}T12:00{% endif %}">+ Pending Urge</button>
+        <button type="button" class="btn btn-sm btn-gavein fc-open-event-btn"
+                data-action="{{ url_for('challenges.record_event', challenge_id=data.challenge.id) }}"
+                data-type="URGE" data-outcome="Gave In"
+                data-ts="{% if not day.is_today %}{{ day.date }}T12:00{% endif %}">+ Gave In</button>
+        <button type="button" class="btn btn-sm btn-action fc-open-event-btn"
+                data-action="{{ url_for('challenges.record_event', challenge_id=data.challenge.id) }}"
+                data-type="ACTION"
+                data-ts="{% if not day.is_today %}{{ day.date }}T12:00{% endif %}">+ Action</button>
+    </div>
+    {% endif %}
+
+    <!-- Chronological Timeline for Selected Day -->
+    <div class="mb-4">
+        <h3 class="h6 fw-bold mb-3">Chronological Event Timeline ({{ day.timeline_events | length }})</h3>
+        {% if day.timeline_events %}
+            <div class="fc-timeline">
+                {% for ev in day.timeline_events %}
+                <div class="fc-timeline-item">
+                    <span class="fc-timeline-dot"
+                          style="background: {% if ev.event_type == 'THOUGHT' %}#6366f1{% elif ev.event_type == 'URGE' and ev.outcome == 'Resisted' %}#10b981{% elif ev.event_type == 'URGE' and ev.outcome == 'Pending' %}#f59e0b{% else %}#ef4444{% endif %};"></span>
+                    <div class="p-2 rounded-3 border small" style="background: var(--bg-subtle); border-color: var(--border-color) !important;">
+                        <div class="d-flex flex-wrap justify-content-between align-items-start gap-2">
+                            <div class="d-flex flex-wrap align-items-center gap-2">
+                                <span class="fw-bold tabular-nums">{{ ev.event_timestamp | local_dt('%I:%M %p') }}</span>
+                                <span class="badge {% if ev.event_type == 'THOUGHT' %}bg-primary-subtle text-primary-emphasis{% elif ev.event_type == 'URGE' %}bg-warning-subtle text-warning-emphasis{% else %}bg-danger-subtle text-danger-emphasis{% endif %}">
+                                    {{ ev.event_type }}
+                                </span>
+                                <span class="fw-semibold {% if ev.outcome == 'Resisted' %}text-success{% elif ev.outcome in ['Gave In', 'Occurred'] %}text-danger{% endif %}">
+                                    {{ ev.outcome }}
+                                </span>
+                                {% if ev.trigger_category %}
+                                    <span class="badge bg-secondary-subtle text-secondary-emphasis">{{ ev.trigger_category }}</span>
+                                {% endif %}
+                                {% if ev.trigger_text %}
+                                    <span style="color: var(--text-muted);">{{ ev.trigger_text }}</span>
+                                {% endif %}
+                                {% if ev.duration_seconds %}
+                                    <span class="tabular-nums" style="color: var(--text-muted);">({{ ev.duration_seconds }}s)</span>
+                                {% endif %}
+                            </div>
+
+                            <div class="d-flex align-items-center gap-1 flex-shrink-0">
+                                {% if ev.event_type == 'URGE' and ev.outcome == 'Pending' %}
+                                    <form method="post" action="{{ url_for('challenges.resolve_event', event_id=ev.id) }}" class="d-inline">
+                                        <input type="hidden" name="outcome" value="Resisted">
+                                        <button type="submit" class="btn btn-sm btn-resisted py-0 px-1" style="font-size: 0.7rem;">Resisted</button>
+                                    </form>
+                                    <form method="post" action="{{ url_for('challenges.resolve_event', event_id=ev.id) }}" class="d-inline">
+                                        <input type="hidden" name="outcome" value="Gave In">
+                                        <button type="submit" class="btn btn-sm btn-gavein py-0 px-1" style="font-size: 0.7rem;">Gave In</button>
+                                    </form>
+                                {% endif %}
+                                <button type="button"
+                                        class="btn btn-sm btn-outline-secondary py-0 px-1 fc-edit-event-btn"
+                                        style="font-size: 0.72rem;"
+                                        data-action="{{ url_for('challenges.edit_event', event_id=ev.id) }}"
+                                        data-type="{{ ev.event_type }}"
+                                        data-outcome="{{ ev.outcome }}"
+                                        data-ts="{{ ev.event_timestamp | local_input }}"
+                                        data-dur="{{ ev.duration_seconds }}"
+                                        data-trigger-category="{{ ev.trigger_category }}"
+                                        data-trigger="{{ ev.trigger_text }}"
+                                        data-context="{{ ev.context }}"
+                                        data-tags="{{ ev.tags }}"
+                                        data-comments="{{ ev.comments }}"
+                                        data-related-urge="{{ ev.related_urge_id or '' }}">
+                                    Edit
+                                </button>
+                                <form method="post" action="{{ url_for('challenges.delete_event', event_id=ev.id) }}" class="d-inline">
+                                    <button type="button" class="btn btn-sm btn-outline-danger py-0 px-1" style="font-size: 0.72rem;"
+                                            data-confirm-title="Move Event to Trash"
+                                            data-confirm-message="Move this {{ ev.event_type }} event to Trash?"
+                                            data-confirm-btn="Move to Trash">
+                                        &times;
+                                    </button>
+                                </form>
+                            </div>
+                        </div>
+                        {% if ev.context or ev.comments %}
+                            <div class="mt-1" style="color: var(--text-muted);">
+                                {% if ev.context %}<span>Location/Context: {{ ev.context }}</span>{% endif %}
+                                {% if ev.context and ev.comments %} · {% endif %}
+                                {% if ev.comments %}<span>{{ ev.comments }}</span>{% endif %}
+                            </div>
+                        {% endif %}
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        {% else %}
+            <div class="small" style="color: var(--text-muted);">No events logged on {{ day.date }}.</div>
+        {% endif %}
+    </div>
+
+    <div class="row g-4">
+        <!-- Multiple Timestamped Daily Reflections -->
+        <div class="col-lg-6">
+            <h3 class="h6 fw-bold mb-2">Timestamped Daily Reflections ({{ day.reflections | length }})</h3>
+            <form method="post" action="{{ url_for('challenges.add_daily_reflection', challenge_id=data.challenge.id) }}" class="p-3 rounded-3 border mb-3" style="background: var(--bg-subtle); border-color: var(--border-color) !important;">
+                <input type="hidden" name="record_date" value="{{ day.date }}">
+                <div class="row g-2 mb-2">
+                    <div class="col-sm-6">
+                        <input type="text" name="title" class="form-control form-control-sm" maxlength="140" placeholder="Title (e.g. Morning check-in)">
+                    </div>
+                    <div class="col-sm-3">
+                        <input type="text" name="mood" class="form-control form-control-sm" maxlength="80" placeholder="Mood">
+                    </div>
+                    <div class="col-sm-3">
+                        <input type="text" name="context" class="form-control form-control-sm" maxlength="300" placeholder="Context">
+                    </div>
+                </div>
+                <div class="mb-2">
+                    <textarea name="reflection_text" class="form-control form-control-sm" rows="2" maxlength="4000" required placeholder="Write a timestamped reflection note for {{ day.date }}..."></textarea>
+                </div>
+                <div class="d-flex justify-content-end">
+                    <button type="submit" class="btn btn-sm text-white" style="background: {{ data.challenge.accent_color | default('#0D9488') }};">+ Add Reflection</button>
+                </div>
+            </form>
+
+            {% if day.reflections %}
+                <div class="d-flex flex-column gap-2 mb-4">
+                    {% for rf in day.reflections %}
+                    <div class="p-2 rounded-3 border small" style="background: var(--bg-subtle); border-color: var(--border-color) !important;">
+                        <div class="d-flex justify-content-between align-items-start gap-2">
+                            <div>
+                                <span class="fw-bold">{{ rf.title or 'Reflection' }}</span>
+                                {% if rf.mood %}<span class="badge bg-secondary-subtle text-secondary-emphasis ms-1">{{ rf.mood }}</span>{% endif %}
+                                {% if rf.context %}<span class="small ms-1" style="color: var(--text-muted);">({{ rf.context }})</span>{% endif %}
+                            </div>
+                            <div class="d-flex gap-1 flex-shrink-0">
+                                <button type="button" class="btn btn-sm btn-outline-secondary py-0 px-1 fc-toggle-edit-reflection" style="font-size: 0.7rem;" data-target="edit-rf-{{ rf.id }}">Edit</button>
+                                <form method="post" action="{{ url_for('challenges.delete_daily_reflection', reflection_id=rf.id) }}" class="d-inline">
+                                    <button type="button" class="btn btn-sm btn-outline-danger py-0 px-1" style="font-size: 0.7rem;"
+                                            data-confirm-title="Delete Reflection"
+                                            data-confirm-message="Delete this reflection entry?"
+                                            data-confirm-btn="Delete">&times;</button>
+                                </form>
+                            </div>
+                        </div>
+                        <div class="mt-1">{{ rf.reflection_text }}</div>
+                        <div class="mt-1" style="font-size: 0.72rem; color: var(--text-muted);">
+                            Created: {{ rf.created_at | local_dt }}
+                            {% if rf.updated_at != rf.created_at %}· <em>Edited: {{ rf.updated_at | local_dt }}</em>{% endif %}
+                        </div>
+                        <form method="post" action="{{ url_for('challenges.edit_daily_reflection', reflection_id=rf.id) }}" id="edit-rf-{{ rf.id }}" class="d-none mt-2">
+                            <div class="row g-1 mb-1">
+                                <div class="col-6"><input type="text" name="title" class="form-control form-control-sm" value="{{ rf.title }}" maxlength="140" placeholder="Title"></div>
+                                <div class="col-3"><input type="text" name="mood" class="form-control form-control-sm" value="{{ rf.mood }}" maxlength="80" placeholder="Mood"></div>
+                                <div class="col-3"><input type="text" name="context" class="form-control form-control-sm" value="{{ rf.context }}" maxlength="300" placeholder="Context"></div>
+                            </div>
+                            <div class="input-group input-group-sm">
+                                <input type="text" name="reflection_text" class="form-control" value="{{ rf.reflection_text }}" required maxlength="4000">
+                                <button type="submit" class="btn btn-primary">Save</button>
+                            </div>
+                        </form>
+                    </div>
+                    {% endfor %}
+                </div>
+            {% endif %}
+
+            <!-- Legacy / Quick Daily Summary Form -->
+            <form method="post" action="{{ url_for('challenges.save_daily_record', challenge_id=data.challenge.id) }}" class="pt-3 border-top" style="border-color: var(--border-color) !important;">
+                <input type="hidden" name="record_date" value="{{ day.date }}">
+                <div class="small fw-bold mb-2">Daily Overall Summary</div>
+                <div class="row g-2 mb-2">
+                    <div class="col-sm-6">
+                        <label class="form-label small fw-semibold mb-1">Mood</label>
+                        <input type="text" name="mood" class="form-control form-control-sm" value="{{ day.mood }}" placeholder="e.g. Focused, Calm" maxlength="80">
+                    </div>
+                    <div class="col-sm-6">
+                        <label class="form-label small fw-semibold mb-1">Context</label>
+                        <input type="text" name="context" class="form-control form-control-sm" value="{{ day.context }}" placeholder="e.g. Exam prep, Weekend" maxlength="300">
+                    </div>
+                </div>
+                <div class="mb-2">
+                    <label class="form-label small fw-semibold mb-1">Summary Takeaway</label>
+                    <textarea name="reflection" class="form-control form-control-sm" rows="2" maxlength="4000" placeholder="Overall takeaway for {{ day.date }}...">{{ day.reflection }}</textarea>
+                </div>
+                <div class="d-flex justify-content-between align-items-center">
+                    <span class="small" style="color: var(--text-muted);">
+                        {% if day.record_updated_at %}Updated {{ day.record_updated_at | local_dt }}{% endif %}
+                    </span>
+                    <button type="submit" class="btn btn-sm btn-outline-primary">Save Daily Summary</button>
+                </div>
+            </form>
+        </div>
+
+        <!-- Timestamped Daily Comments -->
+        <div class="col-lg-6">
+            <h3 class="h6 fw-bold mb-2">Daily Comments ({{ day.comments | length }})</h3>
+            <form method="post" action="{{ url_for('challenges.add_daily_comment', challenge_id=data.challenge.id) }}" class="mb-3">
+                <input type="hidden" name="record_date" value="{{ day.date }}">
+                <div class="input-group input-group-sm">
+                    <input type="text" name="comment_text" class="form-control" placeholder="Add a daily note or check-in..." required maxlength="2000">
+                    <button type="submit" class="btn text-white" style="background: {{ data.challenge.accent_color | default('#0D9488') }};">Add Comment</button>
+                </div>
+            </form>
+
+            {% if day.comments %}
+                <div class="d-flex flex-column gap-2">
+                    {% for cmt in day.comments %}
+                    <div class="p-2 rounded-3 border small" style="background: var(--bg-subtle); border-color: var(--border-color) !important;">
+                        <div class="d-flex justify-content-between align-items-start gap-2">
+                            <div class="comment-text-display">{{ cmt.comment_text }}</div>
+                            <div class="d-flex gap-1 flex-shrink-0">
+                                <button type="button" class="btn btn-sm btn-outline-secondary py-0 px-1 fc-toggle-edit-comment" style="font-size: 0.7rem;" data-target="edit-cmt-{{ cmt.id }}">Edit</button>
+                                <form method="post" action="{{ url_for('challenges.delete_daily_comment', comment_id=cmt.id) }}" class="d-inline">
+                                    <button type="button" class="btn btn-sm btn-outline-danger py-0 px-1" style="font-size: 0.7rem;"
+                                            data-confirm-title="Delete Comment"
+                                            data-confirm-message="Delete this daily comment?"
+                                            data-confirm-btn="Delete">&times;</button>
+                                </form>
+                            </div>
+                        </div>
+                        <div class="mt-1" style="font-size: 0.72rem; color: var(--text-muted);">
+                            Created: {{ cmt.created_at | local_dt }}
+                            {% if cmt.updated_at != cmt.created_at %}
+                                · <em>Edited: {{ cmt.updated_at | local_dt }}</em>
+                            {% endif %}
+                        </div>
+                        <form method="post" action="{{ url_for('challenges.edit_daily_comment', comment_id=cmt.id) }}" id="edit-cmt-{{ cmt.id }}" class="d-none mt-2">
+                            <div class="input-group input-group-sm">
+                                <input type="text" name="comment_text" class="form-control" value="{{ cmt.comment_text }}" required maxlength="2000">
+                                <button type="submit" class="btn btn-primary">Save</button>
+                            </div>
+                        </form>
+                    </div>
+                    {% endfor %}
+                </div>
+            {% else %}
+                <div class="small" style="color: var(--text-muted);">No comments logged for {{ day.date }}.</div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<!-- Compact History Index -->
+{% if data.daily_rows %}
+<div class="fc-card p-3">
+    <h2 class="h6 fw-bold mb-3">All Tracked Dates Overview</h2>
+    <div class="table-responsive">
+        <table class="table table-sm align-middle small mb-0">
+            <thead>
+                <tr>
+                    <th>Date</th>
+                    <th>Thoughts</th>
+                    <th>Urges (R / G / P)</th>
+                    <th>Resist Rate</th>
+                    <th>Actions</th>
+                    <th>Notes</th>
+                    <th class="text-end">Inspect</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for row in data.daily_rows %}
+                <tr class="{% if row.date == data.selected_date %}table-active{% endif %}">
+                    <td class="fw-semibold">
+                        {{ row.date }}
+                        {% if row.is_today %}<span class="badge bg-primary-subtle text-primary-emphasis ms-1">Today</span>{% endif %}
+                    </td>
+                    <td class="tabular-nums">{{ row.metrics.total_thoughts }}</td>
+                    <td class="tabular-nums">{{ row.metrics.resisted_urges }} / {{ row.metrics.gave_in_urges }} / {{ row.metrics.pending_urges }}</td>
+                    <td class="tabular-nums fw-semibold">{{ row.metrics.resistance_rate_display }}</td>
+                    <td class="tabular-nums">{{ row.metrics.total_actions }}</td>
+                    <td class="tabular-nums">{{ (row.reflections | length) + (row.comments | length) }}</td>
+                    <td class="text-end">
+                        <a href="{{ url_for('challenges.daily_tracking', challenge_id=data.challenge.id, date=row.date) }}"
+                           class="btn btn-sm btn-outline-secondary py-0 px-2">Open Day</a>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endif %}
+{% endblock %}
+
+{% block extra_modals %}
+{% set challenge = data.challenge %}
+{% set predefined_triggers = data.predefined_triggers %}
+{% include "challenges/_event_modal.html" %}
+{% endblock %}
+
+{% block extra_js %}
+<script src="{{ url_for('static', filename='js/challenges.js') }}"></script>
+{% endblock %}

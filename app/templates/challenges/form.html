@@ -1,0 +1,190 @@
+{% extends "base.html" %}
+{% block title %}{{ 'Edit ' + challenge.name if challenge else 'Create Challenge' }} — Focus &amp; Control{% endblock %}
+{% block breadcrumbs %}
+    <li class="breadcrumb-item"><a href="{{ url_for('challenges.index') }}" class="text-decoration-none">Urge &amp; Resistance</a></li>
+    <li class="breadcrumb-item active">{{ 'Edit Challenge' if challenge else 'New Challenge' }}</li>
+{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-lg-9">
+        <div class="fc-card fc-card-urge p-4">
+            <h1 class="h4 fw-bold mb-1">{{ 'Edit Challenge & Appearance' if challenge else 'Create Behavioural Challenge' }}</h1>
+            <p class="small mb-4" style="color: var(--text-muted);">Define the behaviour you want to stop or control and customize this challenge's personal workspace.</p>
+
+            <form method="post" enctype="multipart/form-data" class="needs-validation" novalidate>
+                <div class="row g-3 mb-3">
+                    <div class="col-md-6">
+                        <label class="form-label small fw-semibold">Challenge Name *</label>
+                        <input type="text" name="name" class="form-control" value="{{ challenge.name if challenge else '' }}" required maxlength="140" placeholder="e.g. Zero Late-Night Social Media">
+                        <div class="invalid-feedback">Challenge name is required.</div>
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label small fw-semibold">Behaviour to Avoid / Control *</label>
+                        <input type="text" name="behaviour_to_avoid" class="form-control" value="{{ challenge.behaviour_to_avoid if challenge else '' }}" required maxlength="200" placeholder="e.g. Unnecessary Instagram scrolling">
+                        <div class="invalid-feedback">Specify the behaviour to avoid.</div>
+                    </div>
+                </div>
+
+                <div class="mb-3">
+                    <label class="form-label small fw-semibold">Objective</label>
+                    <input type="text" name="objective" class="form-control" value="{{ challenge.objective if challenge else '' }}" maxlength="500" placeholder="e.g. Protect deep work blocks and sleep quality">
+                </div>
+
+                <div class="mb-3">
+                    <label class="form-label small fw-semibold">Description</label>
+                    <textarea name="description" class="form-control" rows="2" maxlength="2000">{{ challenge.description if challenge else '' }}</textarea>
+                </div>
+
+                <div class="row g-3 mb-3">
+                    <div class="col-md-4">
+                        <label class="form-label small fw-semibold">Start Date</label>
+                        <input type="date" name="start_date" id="ch-start-date" class="form-control" value="{{ challenge.start_date if challenge else '' }}">
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label small fw-semibold">Optional End Date</label>
+                        <input type="date" name="end_date" id="ch-end-date" class="form-control" value="{{ challenge.end_date if challenge else '' }}">
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label small fw-semibold">Planned Duration (Days)</label>
+                        <input type="number" min="1" max="36500" step="1" name="planned_duration_days" id="ch-duration-days" class="form-control"
+                               value="{{ challenge.planned_duration_days if challenge and challenge.planned_duration_days else '' }}"
+                               placeholder="Auto from dates or manual">
+                        <div class="form-text small" id="ch-duration-hint">Auto-calculated when start &amp; end dates are set.</div>
+                    </div>
+                </div>
+
+                <div class="row g-3 mb-4">
+                    <div class="col-md-4">
+                        <label class="form-label small fw-semibold">Target Goal Value (Optional)</label>
+                        <input type="number" min="0" max="1000000" step="0.1" name="target_value" class="form-control"
+                               value="{{ challenge.target_value if challenge and challenge.target_value else '' }}" placeholder="e.g. 30">
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label small fw-semibold">Target Unit (Optional)</label>
+                        <input type="text" name="target_unit" class="form-control" maxlength="40"
+                               value="{{ challenge.target_unit if challenge else '' }}" placeholder="e.g. days, urges resisted, %">
+                    </div>
+                    {% if not challenge %}
+                    <div class="col-md-4 d-flex align-items-end">
+                        <div class="form-check mb-2">
+                            <input class="form-check-input" type="checkbox" name="start_immediately" value="1" id="start-now" checked>
+                            <label class="form-check-label small fw-semibold" for="start-now">Start Cycle #1 immediately</label>
+                        </div>
+                    </div>
+                    {% endif %}
+                </div>
+
+                <hr class="my-4" style="border-color: var(--border-color);">
+                <h2 class="h6 fw-bold mb-3">Independent Appearance &amp; Layout Customization</h2>
+
+                <div class="row g-3 mb-3">
+                    <div class="col-md-3">
+                        <label class="form-label small fw-semibold">Font Family</label>
+                        <select name="font_family" class="form-select">
+                            {% for f in fonts %}
+                                <option value="{{ f }}" {% if challenge and challenge.font_family == f %}selected{% endif %}>{{ f }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label small fw-semibold">Font Size</label>
+                        <select name="font_size" class="form-select">
+                            {% for fs in font_sizes %}
+                                <option value="{{ fs }}" {% if (challenge and challenge.font_size == fs) or (not challenge and fs == '16px') %}selected{% endif %}>{{ fs }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label small fw-semibold">Card Style</label>
+                        <select name="card_style" class="form-select">
+                            {% for cs in card_styles %}
+                                <option value="{{ cs }}" {% if challenge and challenge.card_style == cs %}selected{% endif %}>{{ cs | capitalize }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label small fw-semibold">Layout Style</label>
+                        <select name="layout_style" class="form-select">
+                            {% for ls in layout_styles %}
+                                <option value="{{ ls }}" {% if challenge and challenge.layout_style == ls %}selected{% endif %}>{{ ls | capitalize }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                </div>
+
+                <div class="row g-3 mb-3">
+                    <div class="col-md-3 col-6">
+                        <label class="form-label small fw-semibold">Accent Color</label>
+                        <input type="color" name="accent_color" class="form-control form-control-color w-100" value="{{ challenge.accent_color if challenge else '#0D9488' }}">
+                    </div>
+                    <div class="col-md-3 col-6">
+                        <label class="form-label small fw-semibold">Custom Text Color (Optional)</label>
+                        <div class="input-group input-group-sm">
+                            <input type="text" name="text_color" class="form-control" value="{{ challenge.text_color if challenge else '' }}" placeholder="#0F172A or blank">
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label small fw-semibold">Dynamic Background Preset</label>
+                        <select name="background_preset" id="ch-bg-preset" class="form-select">
+                            {% if challenge and challenge.background_image %}
+                                <option value="__keep__" data-preview-url="{{ url_for('static', filename=challenge.background_image) }}" selected>Keep current background</option>
+                            {% endif %}
+                            {% for p in presets %}
+                                <option value="{{ p.id }}" data-preview-url="{{ url_for('static', filename=p.path) if p.path else '' }}">{{ p.label }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                </div>
+
+                <div class="row g-3 mb-4 align-items-center">
+                    <div class="col-md-7">
+                        <label class="form-label small fw-semibold">Upload Custom Background Image (PNG/JPG/WEBP, max 5 MB)</label>
+                        <input type="file" name="background_file" id="ch-bg-file" class="form-control" accept=".png,.jpg,.jpeg,.webp">
+                    </div>
+                    <div class="col-md-5">
+                        <label class="form-label small fw-semibold d-block">Background Preview</label>
+                        <div id="ch-bg-preview" class="rounded-3 border d-flex align-items-center justify-content-center small"
+                             style="height: 64px; border-color: var(--border-color) !important; background-size: cover; background-position: center; background-color: var(--bg-subtle); color: var(--text-muted);{% if challenge and challenge.background_image %} background-image: url('{{ url_for('static', filename=challenge.background_image) }}');{% endif %}">
+                            <span id="ch-bg-preview-label">{% if challenge and challenge.background_image %}{% else %}No background selected{% endif %}</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="mb-4">
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                        <label class="form-label small fw-semibold mb-0">Custom Metadata</label>
+                        <button type="button" class="btn btn-sm btn-outline-secondary py-0 px-2" id="add-ch-meta-row">+ Add Field</button>
+                    </div>
+                    <div id="ch-meta-container" class="d-flex flex-column gap-2">
+                        {% if challenge and challenge.metadata %}
+                            {% for mk, mv in challenge.metadata.items() %}
+                                <div class="row g-2 ch-meta-row">
+                                    <div class="col-5"><input type="text" name="meta_key" class="form-control form-control-sm" value="{{ mk }}"></div>
+                                    <div class="col-6"><input type="text" name="meta_value" class="form-control form-control-sm" value="{{ mv }}"></div>
+                                    <div class="col-1"><button type="button" class="btn btn-sm btn-outline-danger w-100 remove-ch-meta">&times;</button></div>
+                                </div>
+                            {% endfor %}
+                        {% else %}
+                            <div class="row g-2 ch-meta-row">
+                                <div class="col-5"><input type="text" name="meta_key" class="form-control form-control-sm" placeholder="e.g. Accountability"></div>
+                                <div class="col-6"><input type="text" name="meta_value" class="form-control form-control-sm" placeholder="e.g. Daily check-in"></div>
+                                <div class="col-1"><button type="button" class="btn btn-sm btn-outline-danger w-100 remove-ch-meta">&times;</button></div>
+                            </div>
+                        {% endif %}
+                    </div>
+                </div>
+
+                <div class="d-flex justify-content-end gap-2">
+                    <a href="{{ url_for('challenges.details', challenge_id=challenge.id) if challenge else url_for('challenges.index') }}" class="btn btn-outline-secondary">Cancel</a>
+                    <button type="submit" class="btn text-white px-4" style="background: var(--urge-accent);">{{ 'Save Challenge' if challenge else 'Create Challenge' }}</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="{{ url_for('static', filename='js/challenges.js') }}"></script>
+{% endblock %}

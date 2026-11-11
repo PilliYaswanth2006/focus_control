@@ -1,0 +1,536 @@
+{% extends "base.html" %}
+{% block title %}{{ task.name }} — Weighted Task Manager{% endblock %}
+{% block breadcrumbs %}
+    <li class="breadcrumb-item"><a href="{{ url_for('tasks.index') }}" class="text-decoration-none">Weighted Task Manager</a></li>
+    {% if task.linked_parent_id %}
+        <li class="breadcrumb-item"><a href="{{ url_for('tasks.details', task_id=task.linked_parent_id) }}" class="text-decoration-none">{{ task.linked_parent_name }}</a></li>
+    {% endif %}
+    <li class="breadcrumb-item active">{{ task.name }}</li>
+{% endblock %}
+{% block topbar_actions %}
+    <a href="{{ url_for('tasks.edit', task_id=task.id) }}" class="btn btn-sm btn-outline-secondary">Edit Task</a>
+    <button type="button" class="btn btn-sm btn-primary" data-bs-toggle="modal" data-bs-target="#add-item-modal">
+        + Add / Link Task
+    </button>
+{% endblock %}
+
+{% macro render_tree_node(node) %}
+<div class="tree-row mb-2 py-2">
+    <div class="d-flex flex-wrap justify-content-between align-items-center gap-2">
+        <div class="min-w-0">
+            <div class="d-flex align-items-center gap-2 flex-wrap">
+                {% if node.item_type == 'linked_centered' %}
+                    <span class="badge bg-info-subtle text-info-emphasis">Linked Centered Task</span>
+                    <a href="{{ url_for('tasks.details', task_id=node.linked_centered_task_id) }}" class="fw-bold text-decoration-none" style="color: var(--text-primary);">
+                        {{ node.name }}
+                    </a>
+                {% else %}
+                    <a href="{{ url_for('tasks.item_details', item_id=node.id) }}" class="fw-semibold text-decoration-none" style="color: var(--text-primary);">
+                        {{ node.name }}
+                    </a>
+                {% endif %}
+                <span class="status-pill status-{{ node.status | lower | replace(' ', '-') }}">{{ node.status }}</span>
+                <span class="badge bg-secondary-subtle text-secondary-emphasis tabular-nums">{{ node.weight_pct }}%</span>
+                {% if node.is_overdue %}
+                    <span class="badge bg-danger">Overdue ({{ node.due_date }})</span>
+                {% endif %}
+            </div>
+            <div class="small mt-1" style="color: var(--text-muted);">
+                Target: <strong class="tabular-nums">{{ node.target_quantity }} {{ node.target_unit }}</strong>
+                {% if node.target_unit != task.target_unit %}
+                    (Time budget share: <span class="tabular-nums">{{ node.allocated_time_budget }} {{ task.target_unit }}</span>)
+                {% endif %}
+                · Actual: <strong class="tabular-nums">{{ node.actual_quantity }} {{ node.target_unit }}</strong>
+                (<span class="tabular-nums">{{ node.actual_time_hours }} hrs</span>)
+            </div>
+        </div>
+
+        <div class="d-flex align-items-center gap-2">
+            <div style="width: 90px;">
+                <div class="small fw-bold text-end tabular-nums">{{ node.completion_pct }}%</div>
+                <div class="progress" style="height: 6px;">
+                    <div class="progress-bar" style="width: {{ node.completion_pct }}%; background-color: {{ task.primary_color }};"></div>
+                </div>
+            </div>
+            {% if node.item_type == 'standard' %}
+                <button type="button"
+                        class="btn btn-sm btn-primary py-0 px-2 fc-open-progress-btn"
+                        data-action="{{ url_for('tasks.add_progress', item_id=node.id) }}"
+                        data-item-name="{{ node.name }}"
+                        data-unit="{{ node.target_unit }}">
+                    + Log
+                </button>
+                <a href="{{ url_for('tasks.item_details', item_id=node.id) }}" class="btn btn-sm btn-outline-secondary py-0 px-2">Details</a>
+            {% else %}
+                <a href="{{ url_for('tasks.details', task_id=node.linked_centered_task_id) }}" class="btn btn-sm btn-outline-primary py-0 px-2">Open Nested</a>
+            {% endif %}
+            <form method="post" action="{{ url_for('tasks.delete_item', item_id=node.id) }}" class="d-inline">
+                {% if node.item_type == 'linked_centered' %}
+                    <button type="button" class="btn btn-sm btn-outline-warning py-0 px-2"
+                            data-confirm-title="Unlink Nested Task"
+                            data-confirm-message="Unlink '{{ node.name }}' from '{{ task.name }}'? The centered task itself and its own records will remain intact."
+                            data-confirm-btn="Unlink"
+                            data-confirm-class="btn-warning">
+                        Unlink
+                    </button>
+                {% else %}
+                    <button type="button" class="btn btn-sm btn-outline-danger py-0 px-2"
+                            data-confirm-title="Move Internal Task to Trash"
+                            data-confirm-message="Move '{{ node.name }}' to Trash? {% if node.entry_count > 0 %}Its {{ node.entry_count }} progress entry/entries will remain preserved until restored or permanently purged.{% endif %}"
+                            data-confirm-btn="Move to Trash"
+                            data-confirm-input-name="confirm_force"
+                            data-confirm-input-value="1">
+                        &times;
+                    </button>
+                {% endif %}
+            </form>
+        </div>
+    </div>
+
+    {% if node.children %}
+        <div class="mt-2 ms-2">
+            {% for child in node.children %}
+                {{ render_tree_node(child) }}
+            {% endfor %}
+        </div>
+    {% endif %}
+</div>
+{% endmacro %}
+
+{% block content %}
+<!-- Custom Styled Header Banner -->
+<div class="custom-workspace-banner mb-4"
+     style="font-family: '{{ task.font_family }}', sans-serif; border-top: 4px solid {{ task.primary_color }}; {% if task.background_image %}background-image: url('{{ url_for('static', filename=task.background_image) }}');{% endif %}">
+    <div class="custom-workspace-scrim p-4">
+        <div class="d-flex flex-wrap justify-content-between align-items-start gap-3">
+            <div>
+                <div class="d-flex align-items-center gap-2 flex-wrap mb-1">
+                    <h1 class="h3 fw-bold mb-0" style="{% if task.text_color %}color: {{ task.text_color }};{% endif %}">{{ task.name }}</h1>
+                    <span class="status-pill status-{{ task.status | lower | replace(' ', '-') }}">{{ task.status }}</span>
+                    <span class="badge bg-secondary-subtle text-secondary-emphasis">{{ task.priority }} Priority</span>
+                    {% if task.is_demo %}<span class="badge-demo">DEMO</span>{% endif %}
+                </div>
+                {% if task.linked_parent_id %}
+                    <div class="small mb-2" style="color: {{ task.accent_color }};">
+                        Linked inside parent task: <a href="{{ url_for('tasks.details', task_id=task.linked_parent_id) }}" class="fw-semibold text-decoration-none">{{ task.linked_parent_name }}</a> ({{ task.linked_weight_pct }}%)
+                    </div>
+                {% endif %}
+                {% if task.description %}
+                    <p class="small mb-2" style="max-width: 720px;">{{ task.description }}</p>
+                {% endif %}
+                <div class="d-flex flex-wrap gap-3 small" style="color: var(--text-muted);">
+                    <span>Budget Weight: <strong class="tabular-nums">{{ task.weight }}%</strong></span>
+                    <span>Allocated Target: <strong class="tabular-nums">{{ task.target_allocation }} {{ task.target_unit }}</strong></span>
+                    <span>Logged Time: <strong class="tabular-nums">{{ task.metrics.total_time_hours | default(0) }} hrs</strong></span>
+                    {% if task.start_date %}<span>Start: {{ task.start_date }}</span>{% endif %}
+                    {% if task.target_end_date %}<span>End: {{ task.target_end_date }}</span>{% endif %}
+                </div>
+                {% if task.metadata %}
+                    <div class="d-flex flex-wrap gap-2 mt-2">
+                        {% for mk, mv in task.metadata.items() %}
+                            <span class="badge bg-light text-dark border small">{{ mk }}: {{ mv }}</span>
+                        {% endfor %}
+                    </div>
+                {% endif %}
+            </div>
+
+            <div class="text-end">
+                <div class="display-6 fw-bold tabular-nums" style="color: {{ task.primary_color }};">{{ task.metrics.completion_pct | default(0) }}%</div>
+                <div class="small mb-2" style="color: var(--text-muted);">Weighted Progress</div>
+                <div class="d-flex flex-wrap justify-content-end gap-1">
+                    {% if task.status == 'Completed' %}
+                        <form method="post" action="{{ url_for('tasks.reopen_centered', task_id=task.id) }}" class="d-inline">
+                            <input type="hidden" name="reason" value="Reopened from task header">
+                            <button type="submit" class="btn btn-sm btn-warning">Reopen Task</button>
+                        </form>
+                    {% else %}
+                        <form method="post" action="{{ url_for('tasks.change_status', task_id=task.id) }}" class="d-inline">
+                            <input type="hidden" name="status" value="Completed">
+                            <button type="submit" class="btn btn-sm btn-outline-success">Mark Completed</button>
+                        </form>
+                    {% endif %}
+                    <button type="button" class="btn btn-sm btn-outline-secondary" data-bs-toggle="modal" data-bs-target="#clone-centered-modal" title="Clone as a new independent centered task">
+                        Clone Copy...
+                    </button>
+                    <form method="post" action="{{ url_for('tasks.delete', task_id=task.id) }}" class="d-inline">
+                        <button type="button" class="btn btn-sm btn-outline-danger"
+                                data-confirm-title="Move Centered Task to Trash"
+                                data-confirm-message="Move '{{ task.name }}' and its internal items to Trash? You can restore them later or permanently purge them from Settings > Trash."
+                                data-confirm-btn="Move to Trash"
+                                data-confirm-input-name="confirm_force"
+                                data-confirm-input-value="1">
+                            Delete
+                        </button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Weight Validation & Finalization Strip -->
+<div class="fc-card p-3 mb-4">
+    <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-2">
+        <div>
+            <span class="fw-bold small">Internal Weight Allocation:</span>
+            <span class="tabular-nums fw-bold {% if task.metrics.weights_valid_100 %}text-success{% else %}text-warning{% endif %}">
+                {{ task.metrics.total_weight_pct | default(0) }}% / 100%
+            </span>
+            <span class="small ms-2" style="color: var(--text-muted);">
+                ({{ task.metrics.unallocated_weight_pct | default(100) }}% unallocated)
+            </span>
+            {% if task.metrics.weights_valid_100 and task.allocation_finalized %}
+                <span class="badge bg-success-subtle text-success-emphasis ms-1">Finalized 100%</span>
+            {% elif task.metrics.weights_valid_100 %}
+                <span class="badge bg-info-subtle text-info-emphasis ms-1">Ready to Finalize</span>
+            {% elif task.metrics.active_item_count > 0 %}
+                {% set diff = (100 - task.metrics.total_weight_pct) | round(2) %}
+                <span class="small ms-2 text-warning">
+                    {% if diff > 0 %}
+                        {{ diff }}% remaining before weights total 100%.
+                    {% else %}
+                        {{ (diff * -1) | round(2) }}% over 100% — adjust below.
+                    {% endif %}
+                </span>
+            {% endif %}
+        </div>
+        {% if task.metrics.get('items') %}
+            <button class="btn btn-sm btn-outline-primary" type="button" data-bs-toggle="collapse" data-bs-target="#weights-bulk-editor">
+                Adjust &amp; Finalize 100% Weights
+            </button>
+        {% endif %}
+    </div>
+
+    <div class="weight-gauge-bar">
+        <div class="h-100" style="width: {{ [task.metrics.total_weight_pct | default(0), 100] | min }}%; background-color: {% if task.metrics.weights_valid_100 %}#10b981{% else %}{{ task.primary_color }}{% endif %};"></div>
+    </div>
+
+    {% if task.metrics.get('items') %}
+    <div class="collapse mt-3 pt-3 border-top" id="weights-bulk-editor" style="border-color: var(--border-color) !important;">
+        <form method="post" action="{{ url_for('tasks.finalize_weights', task_id=task.id) }}">
+            <div class="table-responsive">
+                <table class="table table-sm align-middle small mb-2">
+                    <thead>
+                        <tr>
+                            <th>Internal Task</th>
+                            <th>Status</th>
+                            <th style="width: 140px;">Weight (%)</th>
+                            <th>Time Share ({{ task.target_unit }})</th>
+                            <th>Target Quantity</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for it in task.metrics['items'] %}
+                            {% if it.status != 'Archived' %}
+                            <tr>
+                                <td class="fw-semibold">{{ it.name }}</td>
+                                <td><span class="status-pill status-{{ it.status | lower | replace(' ', '-') }}">{{ it.status }}</span></td>
+                                <td>
+                                    <input type="number" step="0.1" min="0" max="100"
+                                           name="item_weight_{{ it.id }}"
+                                           class="form-control form-control-sm internal-weight-input"
+                                           data-parent-budget="{{ task.target_allocation }}"
+                                           value="{{ it.weight_pct }}">
+                                </td>
+                                <td class="tabular-nums internal-time-preview">{{ it.allocated_time_budget }} {{ task.target_unit }}</td>
+                                <td class="tabular-nums">{{ it.target_quantity }} {{ it.target_unit }}</td>
+                            </tr>
+                            {% endif %}
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            <div class="d-flex flex-wrap justify-content-between align-items-center gap-2">
+                <div class="small fw-semibold">
+                    Live Total: <span id="internal-weight-total" class="tabular-nums">{{ task.metrics.total_weight_pct }}%</span> / 100%
+                </div>
+                <div class="d-flex align-items-center gap-3">
+                    <div class="form-check small mb-0">
+                        <input class="form-check-input" type="checkbox" name="confirm_update_completed" value="1" id="confirm-completed-internal">
+                        <label class="form-check-label" for="confirm-completed-internal">Allow updating completed tasks</label>
+                    </div>
+                    <button type="submit" class="btn btn-sm btn-success">Finalize Allocation (100%)</button>
+                </div>
+            </div>
+        </form>
+    </div>
+    {% endif %}
+</div>
+
+<!-- Main Tree & Chart Row -->
+<div class="row g-4 mb-4">
+    <div class="col-lg-8">
+        <div class="fc-card p-3 h-100">
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <h2 class="h6 fw-bold mb-0">Task Hierarchy &amp; Internal Tasks</h2>
+                <button type="button" class="btn btn-sm btn-primary" data-bs-toggle="modal" data-bs-target="#add-item-modal">
+                    + Add Internal / Linked Task
+                </button>
+            </div>
+            {% if task.tree_children %}
+                {% for node in task.tree_children %}
+                    {{ render_tree_node(node) }}
+                {% endfor %}
+            {% else %}
+                <div class="empty-state py-4">
+                    <p class="small mb-2" style="color: var(--text-muted);">No internal tasks added yet. Add concrete tasks or link an existing centered task.</p>
+                    <button type="button" class="btn btn-sm btn-primary" data-bs-toggle="modal" data-bs-target="#add-item-modal">Add First Internal Task</button>
+                </div>
+            {% endif %}
+        </div>
+    </div>
+
+    <div class="col-lg-4">
+        <div class="fc-card p-3 h-100">
+            <h2 class="h6 fw-bold mb-3">Target vs Actual Breakdown</h2>
+            {% if task.metrics.get('items') %}
+                <div style="height: 250px;"><canvas id="centeredTaskChart"></canvas></div>
+            {% else %}
+                <div class="empty-state py-4">
+                    <div class="small" style="color: var(--text-muted);">Add internal tasks to view weight &amp; progress chart.</div>
+                </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<!-- Historical Tabs: Snapshots, Recent Progress, Status History -->
+<div class="fc-card p-3">
+    <ul class="nav nav-tabs mb-3" role="tablist">
+        <li class="nav-item"><button class="nav-link active small fw-semibold" data-bs-toggle="tab" data-bs-target="#tab-snapshots" type="button">Allocation Snapshots ({{ task.allocations | length }})</button></li>
+        <li class="nav-item"><button class="nav-link small fw-semibold" data-bs-toggle="tab" data-bs-target="#tab-progress" type="button">Recent Progress ({{ task.recent_progress | length }})</button></li>
+        <li class="nav-item"><button class="nav-link small fw-semibold" data-bs-toggle="tab" data-bs-target="#tab-status-hist" type="button">Status History ({{ task.status_history | length }})</button></li>
+    </ul>
+
+    <div class="tab-content small">
+        <div class="tab-pane fade show active" id="tab-snapshots">
+            {% if task.allocations %}
+                <div class="table-responsive">
+                    <table class="table table-sm align-middle mb-0">
+                        <thead><tr><th>Timestamp</th><th>Scope</th><th>Item</th><th>Mode</th><th>Weight</th><th>Allocated Target</th><th>Reason</th><th>State</th></tr></thead>
+                        <tbody>
+                            {% for s in task.allocations %}
+                            <tr>
+                                <td class="text-nowrap" style="color: var(--text-muted);">{{ s.created_at | local_dt }}</td>
+                                <td>{{ s.scope }}</td>
+                                <td>{{ s.task_item_name_snapshot or s.centered_task_name_snapshot }}</td>
+                                <td>{{ s.budget_mode }}</td>
+                                <td class="tabular-nums">{{ s.weight_pct }}%</td>
+                                <td class="tabular-nums fw-semibold">{{ s.allocated_target }} {{ s.target_unit }}</td>
+                                <td>{{ s.reason }}</td>
+                                <td>{% if s.is_active %}<span class="badge bg-success-subtle text-success-emphasis">Active</span>{% else %}<span class="badge bg-secondary-subtle text-secondary-emphasis">Historical</span>{% endif %}</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            {% else %}
+                <div style="color: var(--text-muted);">No allocation snapshots recorded yet.</div>
+            {% endif %}
+        </div>
+
+        <div class="tab-pane fade" id="tab-progress">
+            {% if task.recent_progress %}
+                <div class="table-responsive">
+                    <table class="table table-sm align-middle mb-0">
+                        <thead><tr><th>Timestamp</th><th>Internal Task</th><th>Quantity</th><th>Time Spent</th><th>Source</th><th>Comments</th></tr></thead>
+                        <tbody>
+                            {% for pe in task.recent_progress %}
+                            <tr>
+                                <td class="text-nowrap" style="color: var(--text-muted);">{{ pe.entry_timestamp | local_dt }}</td>
+                                <td class="fw-semibold">{{ pe.task_item_name }}</td>
+                                <td class="tabular-nums">+{{ pe.quantity_completed }} {{ pe.target_unit }}</td>
+                                <td class="tabular-nums">{{ pe.time_spent_minutes }} min</td>
+                                <td><span class="badge bg-secondary-subtle text-secondary-emphasis">{{ pe.update_source }}</span></td>
+                                <td>{{ pe.comments }}</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            {% else %}
+                <div style="color: var(--text-muted);">No progress entries logged under this centered task yet.</div>
+            {% endif %}
+        </div>
+
+        <div class="tab-pane fade" id="tab-status-hist">
+            {% if task.status_history %}
+                <div class="table-responsive">
+                    <table class="table table-sm align-middle mb-0">
+                        <thead><tr><th>Timestamp</th><th>Entity</th><th>Transition</th><th>Reason</th></tr></thead>
+                        <tbody>
+                            {% for h in task.status_history %}
+                            <tr>
+                                <td class="text-nowrap" style="color: var(--text-muted);">{{ h.changed_at | local_dt }}</td>
+                                <td class="fw-semibold">{{ h.entity_name_snapshot }}</td>
+                                <td>{{ h.from_status or 'New' }} &rarr; <strong>{{ h.to_status }}</strong></td>
+                                <td>{{ h.reason }}</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            {% else %}
+                <div style="color: var(--text-muted);">No status transitions recorded.</div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_modals %}
+{% include "tasks/_progress_modal.html" %}
+
+<!-- Add Internal Task / Link Centered Task Modal -->
+<div class="modal fade" id="add-item-modal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-centered">
+        <div class="modal-content">
+            <form method="post" action="{{ url_for('tasks.add_item', task_id=task.id) }}" class="needs-validation" novalidate>
+                <div class="modal-header">
+                    <h5 class="modal-title fw-bold">Add Internal Task to {{ task.name }}</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="btn-group w-100 mb-3" role="group">
+                        <input type="radio" class="btn-check" name="item_type" id="add-type-std" value="standard" checked>
+                        <label class="btn btn-outline-primary btn-sm" for="add-type-std">Create New Independent Task</label>
+                        <input type="radio" class="btn-check" name="item_type" id="add-type-link" value="linked_centered">
+                        <label class="btn btn-outline-primary btn-sm" for="add-type-link">Link Existing Centered Task</label>
+                    </div>
+
+                    <div id="std-fields-wrap">
+                        <div class="row g-3 mb-3">
+                            <div class="col-md-8">
+                                <label class="form-label small fw-semibold">Internal Task Name *</label>
+                                <input type="text" name="name" id="add-item-name" class="form-control" maxlength="140" placeholder="e.g. Mathematics" required>
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label small fw-semibold">Priority</label>
+                                <select name="priority" class="form-select">
+                                    {% for p in priorities %}
+                                        <option value="{{ p }}" {% if p == 'Medium' %}selected{% endif %}>{{ p }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label small fw-semibold">Description</label>
+                            <textarea name="description" class="form-control" rows="2" maxlength="2000"></textarea>
+                        </div>
+                        <div class="row g-3 mb-3">
+                            <div class="col-md-4">
+                                <label class="form-label small fw-semibold">Target Quantity (blank = auto from weight)</label>
+                                <input type="number" step="0.01" min="0" name="target_quantity" class="form-control" placeholder="Auto">
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label small fw-semibold">Target Unit</label>
+                                <input type="text" name="target_unit" class="form-control" value="{{ task.target_unit }}" placeholder="hours / pages / sessions">
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label small fw-semibold">Status</label>
+                                <select name="status" class="form-select">
+                                    {% for s in statuses %}
+                                        <option value="{{ s }}" {% if s == 'Active' %}selected{% endif %}>{{ s }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div id="link-fields-wrap" class="d-none mb-3">
+                        <label class="form-label small fw-semibold">Select Existing Centered Task to Link</label>
+                        <select name="linked_centered_task_id" id="add-item-link-select" class="form-select">
+                            <option value="">-- Choose centered task --</option>
+                            {% for cand in task.link_candidates %}
+                                <option value="{{ cand.id }}" {% if not cand.eligible %}disabled{% endif %}>
+                                    {{ cand.name }} ({{ cand.status }}) {% if not cand.eligible %}— {{ cand.reason }}{% endif %}
+                                </option>
+                            {% endfor %}
+                        </select>
+                        <div class="form-text small">
+                            Linking reuses an existing centered task object so its internal tasks and progress stay synchronized without duplicate counting. Circular references and multi-parent links are prevented automatically.
+                        </div>
+                    </div>
+
+                    <div class="row g-3 mb-3">
+                        <div class="col-md-4">
+                            <label class="form-label small fw-semibold">Weight Percentage (%) *</label>
+                            <input type="number" step="0.1" min="0" max="{{ [100 - (task.metrics.total_weight_pct | default(0)), 0] | max }}" name="weight_pct" class="form-control" value="{{ [100 - (task.metrics.total_weight_pct | default(0)), 0] | max | round(1) }}" required>
+                            <div class="form-text small">Remaining available: {{ [100 - (task.metrics.total_weight_pct | default(0)), 0] | max | round(2) }}%</div>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label small fw-semibold">Start Date</label>
+                            <input type="date" name="start_date" class="form-control">
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label small fw-semibold">Due Date</label>
+                            <input type="date" name="due_date" class="form-control">
+                        </div>
+                    </div>
+
+                    <div class="mb-0">
+                        <label class="form-label small fw-semibold">Notes</label>
+                        <textarea name="notes" class="form-control" rows="2" maxlength="2000"></textarea>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-outline-secondary btn-sm" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-primary btn-sm">Add Internal Task</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Clone Centered Task Modal -->
+<div class="modal fade" id="clone-centered-modal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <form method="post" action="{{ url_for('tasks.clone_centered', task_id=task.id) }}" class="needs-validation" novalidate>
+                <div class="modal-header">
+                    <h5 class="modal-title fw-bold">Clone Centered Task</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <input type="hidden" name="include_hierarchy_submitted" value="1">
+                    <div class="mb-3">
+                        <label class="form-label small fw-semibold">New Task Name *</label>
+                        <input type="text" name="new_name" class="form-control" value="{{ task.name }} (Copy)" required maxlength="140">
+                        <div class="invalid-feedback">Please provide a name for the cloned task.</div>
+                    </div>
+                    <div class="form-check mb-2">
+                        <input class="form-check-input" type="checkbox" name="include_hierarchy" value="1" id="clone-include-hierarchy" checked>
+                        <label class="form-check-label small fw-semibold" for="clone-include-hierarchy">
+                            Include internal tasks &amp; nested centered task structure
+                        </label>
+                    </div>
+                    <div class="form-check mb-3">
+                        <input class="form-check-input" type="checkbox" name="preserve_progress" value="1" id="clone-preserve-progress">
+                        <label class="form-check-label small fw-semibold" for="clone-preserve-progress">
+                            Preserve recorded progress entries on copied items
+                        </label>
+                    </div>
+                    <div class="small" style="color: var(--text-muted);">
+                        Clones create an independent centered task copy placed into manual mode (0% weight) so top-level weights stay safe within 100%.
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-outline-secondary btn-sm" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-primary btn-sm">Create Clone</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+window.CENTERED_TASK_CHART_DATA = {
+    primaryColor: {{ task.primary_color | tojson }},
+    accentColor: {{ task.accent_color | tojson }},
+    items: {{ task.metrics.get('items', []) | tojson }}
+};
+</script>
+<script src="{{ url_for('static', filename='js/tasks.js') }}"></script>
+{% endblock %}

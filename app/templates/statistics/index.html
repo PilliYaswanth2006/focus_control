@@ -1,0 +1,407 @@
+{% extends "base.html" %}
+{% block title %}Global Statistics — Focus &amp; Control{% endblock %}
+{% block breadcrumbs %}<li class="breadcrumb-item active">Statistics</li>{% endblock %}
+
+{% block content %}
+<div class="d-flex flex-wrap justify-content-between align-items-end gap-3 mb-4">
+    <div>
+        <h1 class="h4 fw-bold mb-1">Global Analytics &amp; Statistics</h1>
+        <p class="small mb-0" style="color: var(--text-muted);">Cross-module reports with period presets, comparison deltas, trigger analytics, and interactive chart drilldown.</p>
+    </div>
+</div>
+
+{% if error_msg %}
+    <div class="alert alert-warning small py-2">{{ error_msg }}</div>
+{% endif %}
+
+<!-- Period Presets, Date Range & Demo Filter -->
+<div class="fc-card p-3 mb-4">
+    <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 pb-3 mb-3 border-bottom" style="border-color: var(--border-color) !important;">
+        <div class="d-flex flex-wrap align-items-center gap-1">
+            <span class="small fw-semibold me-1" style="color: var(--text-muted);">Period:</span>
+            {% for p_key, p_label in [('today', 'Today'), ('7d', 'Last 7 Days'), ('30d', 'Last 30 Days'), ('month', 'This Month'), ('90d', 'Last 90 Days'), ('all', 'All Time')] %}
+                <a href="{{ url_for('statistics.index', preset=p_key, include_demo=(1 if include_demo else 0)) }}"
+                   class="btn btn-sm {% if preset == p_key %}btn-primary{% else %}btn-outline-secondary{% endif %}">
+                    {{ p_label }}
+                </a>
+            {% endfor %}
+        </div>
+        {% if stats.comparison and stats.comparison.has_comparison %}
+        <div class="small" style="color: var(--text-muted);">
+            Comparing against previous {{ stats.comparison.span_days }}-day window ({{ stats.comparison.prev_start }} &rarr; {{ stats.comparison.prev_end }})
+        </div>
+        {% endif %}
+    </div>
+
+    <form method="get" action="{{ url_for('statistics.index') }}" class="row g-2 align-items-end small">
+        <div class="col-md-3">
+            <label class="form-label fw-semibold mb-1">Start Date (Local)</label>
+            <input type="date" name="start_date" class="form-control form-control-sm" value="{{ start_date }}">
+        </div>
+        <div class="col-md-3">
+            <label class="form-label fw-semibold mb-1">End Date (Local)</label>
+            <input type="date" name="end_date" class="form-control form-control-sm" value="{{ end_date }}">
+        </div>
+        {% if has_demo %}
+        <div class="col-md-3">
+            <label class="form-label fw-semibold mb-1">Data Scope</label>
+            <select name="include_demo" class="form-select form-select-sm">
+                <option value="1" {% if include_demo %}selected{% endif %}>All Data (Including Demo)</option>
+                <option value="0" {% if not include_demo %}selected{% endif %}>Personal Data Only (Exclude Demo)</option>
+            </select>
+        </div>
+        {% endif %}
+        <div class="col-md-3 d-flex gap-2">
+            <button type="submit" class="btn btn-sm btn-primary flex-grow-1">Apply Date Filter</button>
+            <a href="{{ url_for('statistics.index', preset='all', include_demo=(1 if include_demo else 0)) }}" class="btn btn-sm btn-outline-secondary">Reset</a>
+        </div>
+    </form>
+
+    {% if stats.comparison and stats.comparison.has_comparison %}
+    <div class="row g-2 mt-3 pt-3 border-top small tabular-nums" style="border-color: var(--border-color) !important;">
+        <div class="col-6 col-md-3">
+            <span style="color: var(--text-muted);">Focus Hours vs Prev:</span>
+            <strong class="{% if stats.comparison.logged_hours_delta > 0 %}text-success{% elif stats.comparison.logged_hours_delta < 0 %}text-danger{% endif %}">
+                {% if stats.comparison.logged_hours_delta > 0 %}+{% endif %}{{ stats.comparison.logged_hours_delta }} hrs
+            </strong>
+        </div>
+        <div class="col-6 col-md-3">
+            <span style="color: var(--text-muted);">Completed Tasks vs Prev:</span>
+            <strong class="{% if stats.comparison.completed_items_delta > 0 %}text-success{% elif stats.comparison.completed_items_delta < 0 %}text-danger{% endif %}">
+                {% if stats.comparison.completed_items_delta > 0 %}+{% endif %}{{ stats.comparison.completed_items_delta }}
+            </strong>
+        </div>
+        <div class="col-6 col-md-3">
+            <span style="color: var(--text-muted);">Urges vs Prev:</span>
+            <strong class="{% if stats.comparison.total_urges_delta < 0 %}text-success{% elif stats.comparison.total_urges_delta > 0 %}text-warning{% endif %}">
+                {% if stats.comparison.total_urges_delta > 0 %}+{% endif %}{{ stats.comparison.total_urges_delta }}
+            </strong>
+        </div>
+        <div class="col-6 col-md-3">
+            <span style="color: var(--text-muted);">Resist Rate vs Prev:</span>
+            {% if stats.comparison.resistance_rate_delta is not none %}
+                <strong class="{% if stats.comparison.resistance_rate_delta > 0 %}text-success{% elif stats.comparison.resistance_rate_delta < 0 %}text-danger{% endif %}">
+                    {% if stats.comparison.resistance_rate_delta > 0 %}+{% endif %}{{ stats.comparison.resistance_rate_delta }} pts
+                </strong>
+            {% else %}
+                <strong>N/A</strong>
+            {% endif %}
+        </div>
+    </div>
+    {% endif %}
+</div>
+
+<!-- MODULE 1: WEIGHTED TASK MANAGER -->
+<div class="mb-5">
+    <div class="d-flex align-items-center gap-2 mb-3">
+        <span class="p-2 rounded-3" style="background: var(--task-accent-soft); color: var(--task-accent);">
+            <i data-lucide="layers" style="width: 18px; height: 18px;"></i>
+        </span>
+        <h2 class="h5 fw-bold mb-0">Weighted Task Manager Analytics</h2>
+    </div>
+
+    <div class="row g-3 row-cols-2 row-cols-md-3 row-cols-xl-5 mb-3">
+        <div class="col">
+            <div class="fc-card kpi-card h-100">
+                <div class="kpi-label">Overall Weighted Progress</div>
+                <div class="kpi-value tabular-nums mt-1" style="color: var(--task-accent);">{{ stats.tasks.overall_progress }}%</div>
+            </div>
+        </div>
+        <div class="col">
+            <div class="fc-card kpi-card h-100">
+                <div class="kpi-label">Time Logged (Range)</div>
+                <div class="kpi-value tabular-nums mt-1">{{ stats.tasks.total_logged_hours }} <span class="fs-6 fw-normal" style="color: var(--text-muted);">hrs</span></div>
+            </div>
+        </div>
+        <div class="col">
+            <div class="fc-card kpi-card h-100">
+                <div class="kpi-label">Allocated Budget</div>
+                <div class="kpi-value tabular-nums mt-1">{{ stats.tasks.total_allocated }} <span class="fs-6 fw-normal" style="color: var(--text-muted);">{{ stats.tasks.budget_unit }}</span></div>
+                <div class="small" style="color: var(--text-muted);">{{ stats.tasks.allocated_weight_pct }}% of total weight</div>
+            </div>
+        </div>
+        <div class="col">
+            <div class="fc-card kpi-card h-100">
+                <div class="kpi-label">Available Budget</div>
+                <div class="kpi-value tabular-nums mt-1 text-info">{{ stats.tasks.available_budget }} <span class="fs-6 fw-normal" style="color: var(--text-muted);">{{ stats.tasks.budget_unit }}</span></div>
+                <div class="small" style="color: var(--text-muted);">{{ stats.tasks.remaining_weight_pct }}% weight unallocated</div>
+            </div>
+        </div>
+        <div class="col">
+            <div class="fc-card kpi-card h-100">
+                <div class="kpi-label">Overdue Internal Tasks</div>
+                <div class="kpi-value tabular-nums mt-1 {% if stats.tasks.overdue_tasks %}text-danger{% endif %}">{{ stats.tasks.overdue_tasks | length }}</div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row g-3 mb-3">
+        <div class="col-lg-5">
+            <div class="fc-card p-3 h-100">
+                <h3 class="h6 fw-bold mb-3">Time Distribution by Centered Task</h3>
+                {% if stats.tasks.distribution %}
+                    <div style="height: 240px;"><canvas id="statTaskDistChart"></canvas></div>
+                {% else %}
+                    <div class="empty-state py-4"><div class="small" style="color: var(--text-muted);">No task data yet.</div></div>
+                {% endif %}
+            </div>
+        </div>
+        <div class="col-lg-7">
+            <div class="fc-card p-3 h-100">
+                <h3 class="h6 fw-bold mb-3">Allocated Target vs Actual Time ({{ stats.tasks.budget_unit }})</h3>
+                {% if stats.tasks.distribution %}
+                    <div style="height: 240px;"><canvas id="statTaskAllocChart"></canvas></div>
+                {% else %}
+                    <div class="empty-state py-4"><div class="small" style="color: var(--text-muted);">No task allocation data yet.</div></div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <div class="row g-3 mb-3">
+        <div class="col-lg-6">
+            <div class="fc-card p-3 h-100">
+                <div class="d-flex justify-content-between align-items-center mb-2">
+                    <h3 class="h6 fw-bold mb-0">Daily Time Logged</h3>
+                    <span class="small" style="color: var(--text-muted);">Click point to inspect logs</span>
+                </div>
+                {% if stats.tasks.daily_series %}
+                    <div style="height: 220px;"><canvas id="statTaskDailyChart" style="cursor: pointer;"></canvas></div>
+                {% else %}
+                    <div class="empty-state py-4"><div class="small" style="color: var(--text-muted);">No progress entries in date range.</div></div>
+                {% endif %}
+            </div>
+        </div>
+        <div class="col-lg-6">
+            <div class="fc-card p-3 h-100">
+                <h3 class="h6 fw-bold mb-3">Task Completion Trend</h3>
+                {% if stats.tasks.completion_trend %}
+                    <div style="height: 220px;"><canvas id="statTaskCompChart"></canvas></div>
+                {% else %}
+                    <div class="empty-state py-4"><div class="small" style="color: var(--text-muted);">No completed tasks in date range.</div></div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <div class="row g-3">
+        <div class="col-lg-7">
+            <div class="fc-card p-3 h-100">
+                <h3 class="h6 fw-bold mb-3">Target vs Actual Quantities (Custom Units &amp; Hours)</h3>
+                {% if stats.tasks.target_vs_actual_items %}
+                    <div class="table-responsive">
+                        <table class="table table-sm align-middle small mb-0">
+                            <thead><tr><th>Internal Task</th><th>Centered Parent</th><th>Target</th><th>Actual</th><th>Status</th></tr></thead>
+                            <tbody>
+                                {% for it in stats.tasks.target_vs_actual_items %}
+                                <tr>
+                                    <td class="fw-semibold">{{ it.name }}</td>
+                                    <td style="color: var(--text-muted);">{{ it.parent_name }}</td>
+                                    <td class="tabular-nums">{{ it.target_quantity }} {{ it.target_unit }}</td>
+                                    <td class="tabular-nums fw-semibold">{{ it.actual_quantity }} {{ it.target_unit }}</td>
+                                    <td><span class="status-pill status-{{ it.status | lower | replace(' ', '-') }}">{{ it.status }}</span></td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                {% else %}
+                    <div class="small" style="color: var(--text-muted);">No internal tasks found.</div>
+                {% endif %}
+            </div>
+        </div>
+        <div class="col-lg-5">
+            <div class="fc-card p-3 h-100">
+                <h3 class="h6 fw-bold mb-3">Overdue Tasks</h3>
+                {% if stats.tasks.overdue_tasks %}
+                    <div class="table-responsive">
+                        <table class="table table-sm align-middle small mb-0">
+                            <thead><tr><th>Task</th><th>Parent</th><th>Due Date</th></tr></thead>
+                            <tbody>
+                                {% for od in stats.tasks.overdue_tasks %}
+                                <tr>
+                                    <td class="fw-semibold"><a href="{{ url_for('tasks.item_details', item_id=od.id) }}" class="text-decoration-none">{{ od.name }}</a></td>
+                                    <td style="color: var(--text-muted);">{{ od.parent_name }}</td>
+                                    <td class="text-danger fw-semibold">{{ od.due_date }}</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                {% else %}
+                    <div class="small text-success">Zero overdue internal tasks!</div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- MODULE 2: URGE & RESISTANCE TRACKER -->
+<div>
+    <div class="d-flex align-items-center gap-2 mb-3">
+        <span class="p-2 rounded-3" style="background: var(--urge-accent-soft); color: var(--urge-accent);">
+            <i data-lucide="shield-check" style="width: 18px; height: 18px;"></i>
+        </span>
+        <h2 class="h5 fw-bold mb-0">Urge &amp; Resistance Analytics</h2>
+    </div>
+
+    <div class="row g-3 mb-3">
+        <div class="col-6 col-md-2">
+            <div class="fc-card kpi-card">
+                <div class="kpi-label">Resistance Rate</div>
+                <div class="kpi-value tabular-nums mt-1" style="color: var(--urge-accent);">{{ stats.challenges.summary.resistance_rate_display }}</div>
+            </div>
+        </div>
+        <div class="col-6 col-md-2">
+            <div class="fc-card kpi-card">
+                <div class="kpi-label">Thoughts</div>
+                <div class="kpi-value tabular-nums mt-1">{{ stats.challenges.summary.total_thoughts }}</div>
+            </div>
+        </div>
+        <div class="col-6 col-md-2">
+            <div class="fc-card kpi-card">
+                <div class="kpi-label">Total Urges</div>
+                <div class="kpi-value tabular-nums mt-1">{{ stats.challenges.summary.total_urges }}</div>
+            </div>
+        </div>
+        <div class="col-6 col-md-2">
+            <div class="fc-card kpi-card">
+                <div class="kpi-label">Resisted</div>
+                <div class="kpi-value tabular-nums mt-1 text-success">{{ stats.challenges.summary.resisted_urges }}</div>
+            </div>
+        </div>
+        <div class="col-6 col-md-2">
+            <div class="fc-card kpi-card">
+                <div class="kpi-label">Gave In</div>
+                <div class="kpi-value tabular-nums mt-1 text-danger">{{ stats.challenges.summary.gave_in_urges }}</div>
+            </div>
+        </div>
+        <div class="col-6 col-md-2">
+            <div class="fc-card kpi-card">
+                <div class="kpi-label">Actual Actions</div>
+                <div class="kpi-value tabular-nums mt-1">{{ stats.challenges.summary.total_actions }}</div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row g-3 mb-3">
+        <div class="col-lg-6">
+            <div class="fc-card p-3 h-100">
+                <div class="d-flex justify-content-between align-items-center mb-2">
+                    <div>
+                        <h3 class="h6 fw-bold mb-0">Urge &amp; Behaviour Trends</h3>
+                        <span class="small" style="color: var(--text-muted);">Click a bar to inspect matching events</span>
+                    </div>
+                    <div class="btn-group btn-group-sm" role="group">
+                        <button type="button" class="btn btn-outline-secondary active stat-trend-granularity" data-gran="daily">Daily</button>
+                        <button type="button" class="btn btn-outline-secondary stat-trend-granularity" data-gran="weekly">Weekly</button>
+                        <button type="button" class="btn btn-outline-secondary stat-trend-granularity" data-gran="monthly">Monthly</button>
+                    </div>
+                </div>
+                {% if stats.challenges.daily_series %}
+                    <div style="height: 240px;"><canvas id="statUrgeTrendChart" style="cursor: pointer;"></canvas></div>
+                {% else %}
+                    <div class="empty-state py-4"><div class="small" style="color: var(--text-muted);">No urge or action events in range.</div></div>
+                {% endif %}
+            </div>
+        </div>
+
+        <div class="col-lg-6">
+            <div class="fc-card p-3 h-100">
+                <h3 class="h6 fw-bold mb-3">Time-of-Day Analysis (24h Local)</h3>
+                <div style="height: 240px;"><canvas id="statUrgeHourlyChart"></canvas></div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row g-3">
+        <div class="col-lg-5">
+            <div class="fc-card p-3 h-100">
+                <div class="d-flex justify-content-between align-items-center mb-2">
+                    <h3 class="h6 fw-bold mb-0">Trigger Analysis</h3>
+                    <span class="small" style="color: var(--text-muted);">Click bar for details</span>
+                </div>
+                {% if stats.challenges.top_triggers %}
+                    <div style="height: 210px;" class="mb-3"><canvas id="statTriggerChart" style="cursor: pointer;"></canvas></div>
+                    {% if stats.challenges.trigger_analytics and stats.challenges.trigger_analytics.categories %}
+                        <div class="table-responsive">
+                            <table class="table table-sm align-middle small mb-0">
+                                <thead>
+                                    <tr><th>Category</th><th>Total</th><th>R / G / P</th><th>Resist Rate</th></tr>
+                                </thead>
+                                <tbody>
+                                    {% for cat in stats.challenges.trigger_analytics.categories %}
+                                    <tr>
+                                        <td class="fw-semibold">{{ cat.trigger }}</td>
+                                        <td class="tabular-nums">{{ cat.total }}</td>
+                                        <td class="tabular-nums">{{ cat.resisted }} / {{ cat.gave_in }} / {{ cat.pending }}</td>
+                                        <td class="tabular-nums fw-semibold">{{ cat.resistance_rate_display }}</td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    {% endif %}
+                {% else %}
+                    <div class="empty-state py-4"><div class="small" style="color: var(--text-muted);">No triggers logged yet.</div></div>
+                {% endif %}
+            </div>
+        </div>
+
+        <div class="col-lg-7">
+            <div class="fc-card p-3 h-100">
+                <h3 class="h6 fw-bold mb-3">Challenge Comparison</h3>
+                {% if stats.challenges.comparison %}
+                    <div class="table-responsive">
+                        <table class="table table-sm align-middle small mb-0">
+                            <thead><tr><th>Challenge</th><th>Status</th><th>Thoughts</th><th>Urges (R / G / P)</th><th>Actions</th><th>Resistance Rate</th></tr></thead>
+                            <tbody>
+                                {% for c in stats.challenges.comparison %}
+                                <tr>
+                                    <td class="fw-semibold"><a href="{{ url_for('challenges.details', challenge_id=c.id) }}" class="text-decoration-none">{{ c.name }}</a></td>
+                                    <td><span class="status-pill status-{{ c.status | lower | replace(' ', '-') }}">{{ c.status }}</span></td>
+                                    <td class="tabular-nums">{{ c.total_thoughts }}</td>
+                                    <td class="tabular-nums">{{ c.resisted_urges }} / {{ c.gave_in_urges }} / {{ c.pending_urges }}</td>
+                                    <td class="tabular-nums">{{ c.total_actions }}</td>
+                                    <td class="tabular-nums fw-bold" style="color: {{ c.accent_color }};">{{ c.resistance_rate_display }}</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                {% else %}
+                    <div class="small" style="color: var(--text-muted);">No challenges available to compare.</div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_modals %}
+<!-- Interactive Statistics Drilldown Modal -->
+<div class="modal fade" id="fc-stats-drilldown-modal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
+        <div class="modal-content">
+            <div class="modal-header">
+                <div>
+                    <h5 class="modal-title fw-bold mb-0" id="fc-drilldown-title">Record Details</h5>
+                    <div class="small" style="color: var(--text-muted);" id="fc-drilldown-subtitle"></div>
+                </div>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body" id="fc-drilldown-body"></div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-outline-secondary btn-sm" data-bs-dismiss="modal">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+window.GLOBAL_STATS = {{ stats | tojson }};
+</script>
+<script src="{{ url_for('static', filename='js/statistics.js') }}"></script>
+{% endblock %}

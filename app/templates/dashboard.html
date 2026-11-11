@@ -1,0 +1,386 @@
+{% extends "base.html" %}
+{% block title %}Dashboard — Focus &amp; Control{% endblock %}
+{% block breadcrumbs %}<li class="breadcrumb-item active">Overview</li>{% endblock %}
+{% block topbar_actions %}
+    <a href="{{ url_for('tasks.create') }}" class="btn btn-sm btn-primary d-inline-flex align-items-center gap-1">
+        <i data-lucide="plus" style="width: 14px; height: 14px;"></i>
+        <span class="d-none d-sm-inline">New Task</span>
+    </a>
+    <a href="{{ url_for('challenges.create') }}" class="btn btn-sm btn-outline-success d-inline-flex align-items-center gap-1">
+        <i data-lucide="shield-plus" style="width: 14px; height: 14px;"></i>
+        <span class="d-none d-sm-inline">New Challenge</span>
+    </a>
+{% endblock %}
+
+{% block content %}
+<div class="d-flex flex-wrap justify-content-between align-items-end gap-3 mb-4">
+    <div>
+        <h1 class="h4 fw-bold mb-1">Welcome back, {{ app_settings.display_name }}</h1>
+        <p class="small mb-0" style="color: var(--text-muted);">
+            Live productivity &amp; behavioural control summary across your active workspace.
+        </p>
+    </div>
+    <div class="small text-end" style="color: var(--text-muted);">
+        <div>
+            Budget Mode: <span class="fw-semibold text-capitalize">{{ summary.budget_mode }}</span>
+            (<span class="tabular-nums">{{ summary.budget_allocated }} / {{ summary.budget_total }} {{ summary.budget_unit }}</span> allocated ·
+            <strong class="tabular-nums">{{ summary.budget_available }} {{ summary.budget_unit }}</strong> available)
+        </div>
+        <div class="mt-1">
+            Today: <strong class="tabular-nums">{{ summary.today_time_hours }} hrs</strong> logged ({{ summary.today_progress_count }} entries) ·
+            Urges Today: <strong class="tabular-nums">{{ summary.today_urge_metrics.resisted_urges }}/{{ summary.today_urge_metrics.total_urges }}</strong> resisted ·
+            <a href="{{ url_for('calendar.index') }}" class="text-decoration-none ms-1">Open Calendar</a>
+        </div>
+    </div>
+</div>
+
+{% if summary.active_session %}
+<div class="fc-card p-3 mb-4 d-flex flex-wrap align-items-center justify-content-between gap-3" style="border-left: 4px solid var(--task-accent);">
+    <div class="d-flex align-items-center gap-3">
+        <span class="badge bg-primary">FOCUS SESSION LIVE</span>
+        <div>
+            <div class="fw-semibold">{{ summary.active_session.task_item_name }}</div>
+            <div class="small" style="color: var(--text-muted);">Started {{ summary.active_session.started_at | local_dt }}</div>
+        </div>
+    </div>
+    <div class="d-flex align-items-center gap-3">
+        <span class="fs-5 fw-bold tabular-nums" data-timer-start="{{ summary.active_session.started_at }}">00:00</span>
+        <a href="{{ url_for('tasks.item_details', item_id=summary.active_session.task_item_id) }}" class="btn btn-sm btn-primary">
+            Manage Session
+        </a>
+    </div>
+</div>
+{% endif %}
+
+<!-- Two Main Module Cards -->
+<div class="row g-3 mb-4">
+    <div class="col-lg-6">
+        <div class="fc-card fc-card-hover fc-card-task p-4 h-100 d-flex flex-column justify-content-between">
+            <div>
+                <div class="d-flex justify-content-between align-items-start mb-3">
+                    <div class="d-flex align-items-center gap-2">
+                        <span class="p-2 rounded-3" style="background: var(--task-accent-soft); color: var(--task-accent);">
+                            <i data-lucide="layers" style="width: 20px; height: 20px;"></i>
+                        </span>
+                        <div>
+                            <h2 class="h6 fw-bold mb-0">Weighted Task Manager</h2>
+                            <div class="small" style="color: var(--text-muted);">Hierarchical weights &amp; budget allocation</div>
+                        </div>
+                    </div>
+                    <span class="fs-4 fw-bold tabular-nums" style="color: var(--task-accent);">{{ summary.overall_task_pct }}%</span>
+                </div>
+                <div class="progress mb-3" style="height: 8px;">
+                    <div class="progress-bar" style="width: {{ summary.overall_task_pct }}%; background-color: var(--task-accent);"></div>
+                </div>
+                <div class="row g-2 small mb-3">
+                    <div class="col-4">
+                        <div style="color: var(--text-muted);">Centered Tasks</div>
+                        <div class="fw-semibold tabular-nums">{{ summary.total_centered_tasks }}</div>
+                    </div>
+                    <div class="col-4">
+                        <div style="color: var(--text-muted);">Time Logged</div>
+                        <div class="fw-semibold tabular-nums">{{ summary.total_time_hours }} hrs</div>
+                    </div>
+                    <div class="col-4">
+                        <div style="color: var(--text-muted);">Overdue Items</div>
+                        <div class="fw-semibold tabular-nums {% if summary.overdue_count > 0 %}text-danger{% endif %}">{{ summary.overdue_count }}</div>
+                    </div>
+                </div>
+            </div>
+            <div class="d-flex gap-2">
+                <a href="{{ url_for('tasks.index') }}" class="btn btn-sm btn-primary">Open Task Manager</a>
+                <a href="{{ url_for('tasks.completed') }}" class="btn btn-sm btn-outline-secondary">Completed ({{ summary.completed_count }})</a>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-lg-6">
+        <div class="fc-card fc-card-hover fc-card-urge p-4 h-100 d-flex flex-column justify-content-between">
+            <div>
+                <div class="d-flex justify-content-between align-items-start mb-3">
+                    <div class="d-flex align-items-center gap-2">
+                        <span class="p-2 rounded-3" style="background: var(--urge-accent-soft); color: var(--urge-accent);">
+                            <i data-lucide="shield-check" style="width: 20px; height: 20px;"></i>
+                        </span>
+                        <div>
+                            <h2 class="h6 fw-bold mb-0">Urge &amp; Resistance Tracker</h2>
+                            <div class="small" style="color: var(--text-muted);">Thoughts, urges, resistance &amp; behavioural cycles</div>
+                        </div>
+                    </div>
+                    <span class="fs-4 fw-bold tabular-nums" style="color: var(--urge-accent);">{{ summary.urge_metrics.resistance_rate_display }}</span>
+                </div>
+                <div class="row g-2 small mb-3">
+                    <div class="col-3">
+                        <div style="color: var(--text-muted);">Active</div>
+                        <div class="fw-semibold tabular-nums">{{ summary.active_challenges | length }} / {{ summary.challenges_count }}</div>
+                    </div>
+                    <div class="col-3">
+                        <div style="color: var(--text-muted);">Thoughts</div>
+                        <div class="fw-semibold tabular-nums">{{ summary.urge_metrics.total_thoughts }}</div>
+                    </div>
+                    <div class="col-3">
+                        <div style="color: var(--text-muted);">Resisted</div>
+                        <div class="fw-semibold tabular-nums text-success">{{ summary.urge_metrics.resisted_urges }} / {{ summary.urge_metrics.total_urges }}</div>
+                    </div>
+                    <div class="col-3">
+                        <div style="color: var(--text-muted);">Actions</div>
+                        <div class="fw-semibold tabular-nums text-danger">{{ summary.urge_metrics.total_actions }}</div>
+                    </div>
+                </div>
+            </div>
+            <div class="d-flex gap-2">
+                <a href="{{ url_for('challenges.index') }}" class="btn btn-sm text-white" style="background-color: var(--urge-accent);">Open Tracker</a>
+                <a href="{{ url_for('statistics.index') }}" class="btn btn-sm btn-outline-secondary">Analytics</a>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Quick Stats Row -->
+<div class="row g-3 mb-4">
+    <div class="col-6 col-xl-3">
+        <div class="fc-card kpi-card">
+            <div class="kpi-label">Logged Last 7 Days</div>
+            <div class="kpi-value tabular-nums mt-1">{{ summary.week_time_hours }} <span class="fs-6 fw-normal" style="color: var(--text-muted);">hrs</span></div>
+        </div>
+    </div>
+    <div class="col-6 col-xl-3">
+        <div class="fc-card kpi-card">
+            <div class="kpi-label">Completed Tasks</div>
+            <div class="kpi-value tabular-nums mt-1">{{ summary.completed_count }}</div>
+        </div>
+    </div>
+    <div class="col-6 col-xl-3">
+        <div class="fc-card kpi-card">
+            <div class="kpi-label">Pending Urges</div>
+            <div class="kpi-value tabular-nums mt-1 {% if summary.urge_metrics.pending_urges > 0 %}text-warning{% endif %}">{{ summary.urge_metrics.pending_urges }}</div>
+        </div>
+    </div>
+    <div class="col-6 col-xl-3">
+        <div class="fc-card kpi-card">
+            <div class="kpi-label">Gave-In Urges</div>
+            <div class="kpi-value tabular-nums mt-1">{{ summary.urge_metrics.gave_in_urges }}</div>
+        </div>
+    </div>
+</div>
+
+<!-- Charts Row -->
+<div class="row g-3 mb-4">
+    <div class="col-lg-4">
+        <div class="fc-card p-3 h-100">
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <h3 class="h6 fw-bold mb-0">Centered Task Progress (%)</h3>
+                <a href="{{ url_for('statistics.index') }}" class="small text-decoration-none">Full Report</a>
+            </div>
+            {% if summary.root_chart_data %}
+                <div style="height: 230px;"><canvas id="dashTaskChart"></canvas></div>
+            {% else %}
+                <div class="empty-state py-4">
+                    <div class="small" style="color: var(--text-muted);">Create centered tasks to visualize weighted progress.</div>
+                </div>
+            {% endif %}
+        </div>
+    </div>
+    <div class="col-lg-4">
+        <div class="fc-card p-3 h-100">
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <h3 class="h6 fw-bold mb-0">7-Day Focus Hours</h3>
+                <a href="{{ url_for('calendar.index') }}" class="small text-decoration-none">Calendar</a>
+            </div>
+            {% if summary.weekly_task_hours_series %}
+                <div style="height: 230px;"><canvas id="dashWeeklyHoursChart"></canvas></div>
+            {% else %}
+                <div class="empty-state py-4">
+                    <div class="small" style="color: var(--text-muted);">Log task sessions to view your 7-day rhythm.</div>
+                </div>
+            {% endif %}
+        </div>
+    </div>
+    <div class="col-lg-4">
+        <div class="fc-card p-3 h-100">
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <h3 class="h6 fw-bold mb-0">Recent Urge Resistance Trend</h3>
+                <a href="{{ url_for('statistics.index') }}" class="small text-decoration-none">Details</a>
+            </div>
+            {% if summary.daily_urge_trend %}
+                <div style="height: 230px;"><canvas id="dashUrgeChart"></canvas></div>
+            {% else %}
+                <div class="empty-state py-4">
+                    <div class="small" style="color: var(--text-muted);">Record urge events to visualize resistance trends.</div>
+                </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<!-- Upcoming Deadlines & Pending Urges Quick Resolve -->
+<div class="row g-3 mb-4">
+    <div class="col-lg-6">
+        <div class="fc-card p-3 h-100">
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <h3 class="h6 fw-bold mb-0">Upcoming Deadlines (Next 7 Days)</h3>
+                <a href="{{ url_for('tasks.index', sort_by='deadline') }}" class="small text-decoration-none">View Tasks</a>
+            </div>
+            {% if summary.upcoming_deadlines %}
+                <div class="list-group list-group-flush small">
+                    {% for ud in summary.upcoming_deadlines %}
+                    <a href="{{ url_for('tasks.item_details', item_id=ud.id) }}" class="list-group-item list-group-item-action bg-transparent px-0 border-bottom d-flex justify-content-between align-items-center" style="border-color: var(--border-color) !important; color: var(--text-primary);">
+                        <div class="min-w-0 pe-2">
+                            <div class="fw-semibold text-truncate">{{ ud.name }}</div>
+                            <div style="color: var(--text-muted);">{{ ud.parent_name }} · {{ ud.priority }}</div>
+                        </div>
+                        <span class="badge bg-warning-subtle text-warning-emphasis tabular-nums">{{ ud.due_date }}</span>
+                    </a>
+                    {% endfor %}
+                </div>
+            {% else %}
+                <div class="small" style="color: var(--text-muted);">
+                    No internal task deadlines in the next 7 days.
+                    {% if summary.overdue_items %}
+                        <span class="text-danger fw-semibold ms-1">{{ summary.overdue_count }} overdue item(s) need attention.</span>
+                    {% endif %}
+                </div>
+            {% endif %}
+        </div>
+    </div>
+
+    <div class="col-lg-6">
+        <div class="fc-card p-3 h-100">
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <h3 class="h6 fw-bold mb-0">Pending Urges — Quick Resolve</h3>
+                <a href="{{ url_for('challenges.index') }}" class="small text-decoration-none">Open Tracker</a>
+            </div>
+            {% if summary.pending_urges %}
+                <div class="d-flex flex-column gap-2 small">
+                    {% for pu in summary.pending_urges %}
+                    <div class="p-2 rounded-3 border d-flex flex-wrap justify-content-between align-items-center gap-2" style="border-color: var(--border-color) !important; background: var(--bg-subtle);">
+                        <div class="min-w-0">
+                            <a href="{{ url_for('challenges.details', challenge_id=pu.challenge_id) }}" class="fw-semibold text-decoration-none" style="color: var(--text-primary);">{{ pu.challenge_name }}</a>
+                            <div style="color: var(--text-muted); font-size: 0.78rem;">
+                                {{ pu.event_timestamp | local_dt('%b %d %I:%M %p') }}
+                                {% if pu.trigger_category or pu.trigger_text %} · {{ pu.trigger_text or pu.trigger_category }}{% endif %}
+                            </div>
+                        </div>
+                        <div class="d-flex gap-1">
+                            <form method="post" action="{{ url_for('challenges.resolve_event', event_id=pu.id) }}" class="d-inline">
+                                <input type="hidden" name="outcome" value="Resisted">
+                                <button type="submit" class="btn btn-sm btn-resisted py-0 px-2" style="font-size: 0.74rem;">Resisted</button>
+                            </form>
+                            <form method="post" action="{{ url_for('challenges.resolve_event', event_id=pu.id) }}" class="d-inline">
+                                <input type="hidden" name="outcome" value="Gave In">
+                                <button type="submit" class="btn btn-sm btn-gavein py-0 px-2" style="font-size: 0.74rem;">Gave In</button>
+                            </form>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+            {% else %}
+                <div class="small" style="color: var(--text-muted);">No pending urges waiting for outcome resolution.</div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<!-- Lists Row -->
+<div class="row g-3">
+    <div class="col-lg-6">
+        <div class="fc-card p-3 h-100">
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <h3 class="h6 fw-bold mb-0">Recently Updated Tasks</h3>
+                <a href="{{ url_for('tasks.index') }}" class="small text-decoration-none">View All</a>
+            </div>
+            {% if summary.recent_tasks %}
+                <div class="list-group list-group-flush">
+                    {% for t in summary.recent_tasks %}
+                        <a href="{{ url_for('tasks.details', task_id=t.id) }}" class="list-group-item list-group-item-action bg-transparent px-0 border-bottom d-flex justify-content-between align-items-center" style="border-color: var(--border-color) !important; color: var(--text-primary);">
+                            <div class="min-w-0 pe-3">
+                                <div class="d-flex align-items-center gap-2">
+                                    <span class="d-inline-block rounded-circle" style="width: 9px; height: 9px; background: {{ t.primary_color }};"></span>
+                                    <span class="fw-semibold text-truncate">{{ t.name }}</span>
+                                    {% if t.is_demo %}<span class="badge-demo">DEMO</span>{% endif %}
+                                </div>
+                                <div class="small" style="color: var(--text-muted);">
+                                    Weight: {{ t.weight }}% · Target: {{ t.target_allocation }} {{ t.target_unit }} · {{ t.metrics.total_time_hours | default(0) }} hrs logged
+                                </div>
+                            </div>
+                            <div class="text-end flex-shrink-0">
+                                <div class="fw-bold tabular-nums small">{{ t.metrics.completion_pct | default(0) }}%</div>
+                                <span class="status-pill status-{{ t.status | lower | replace(' ', '-') }}">{{ t.status }}</span>
+                            </div>
+                        </a>
+                    {% endfor %}
+                </div>
+            {% else %}
+                <div class="empty-state py-4">
+                    <p class="small mb-2" style="color: var(--text-muted);">No tasks created yet.</p>
+                    <a href="{{ url_for('tasks.create') }}" class="btn btn-sm btn-primary">Create First Centered Task</a>
+                </div>
+            {% endif %}
+        </div>
+    </div>
+
+    <div class="col-lg-6">
+        <div class="fc-card p-3 h-100">
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <h3 class="h6 fw-bold mb-0">Active Challenges</h3>
+                <a href="{{ url_for('challenges.index') }}" class="small text-decoration-none">View All</a>
+            </div>
+            {% if summary.active_challenges %}
+                <div class="d-flex flex-column gap-3">
+                    {% for ch in summary.active_challenges %}
+                        <div class="p-3 rounded-3 border" style="border-color: var(--border-color) !important; border-left: 3px solid {{ ch.accent_color | default('#0D9488') }} !important;">
+                            <div class="d-flex justify-content-between align-items-start gap-2 mb-2">
+                                <div>
+                                    <a href="{{ url_for('challenges.details', challenge_id=ch.id) }}" class="fw-semibold text-decoration-none" style="color: var(--text-primary);">
+                                        {{ ch.name }}
+                                    </a>
+                                    {% if ch.is_demo %}<span class="badge-demo ms-1">DEMO</span>{% endif %}
+                                    <div class="small" style="color: var(--text-muted);">
+                                        Cycle #{{ ch.current_cycle_number | default(1) }} · Avoid: {{ ch.behaviour_to_avoid }}
+                                    </div>
+                                </div>
+                                <span class="fw-bold tabular-nums small" style="color: var(--urge-accent);">
+                                    {{ ch.metrics.resistance_rate_display }}
+                                </span>
+                            </div>
+                            <div class="d-flex flex-wrap gap-1">
+                                <form method="post" action="{{ url_for('challenges.record_event', challenge_id=ch.id) }}" class="d-inline">
+                                    <input type="hidden" name="event_type" value="THOUGHT">
+                                    <button type="submit" class="btn btn-xs btn-sm btn-thought py-0 px-2" style="font-size: 0.76rem;">+ Thought</button>
+                                </form>
+                                <form method="post" action="{{ url_for('challenges.record_event', challenge_id=ch.id) }}" class="d-inline">
+                                    <input type="hidden" name="event_type" value="URGE">
+                                    <input type="hidden" name="outcome" value="Resisted">
+                                    <button type="submit" class="btn btn-sm btn-resisted py-0 px-2" style="font-size: 0.76rem;">Resisted</button>
+                                </form>
+                                <form method="post" action="{{ url_for('challenges.record_event', challenge_id=ch.id) }}" class="d-inline">
+                                    <input type="hidden" name="event_type" value="URGE">
+                                    <input type="hidden" name="outcome" value="Gave In">
+                                    <button type="submit" class="btn btn-sm btn-gavein py-0 px-2" style="font-size: 0.76rem;">Gave In</button>
+                                </form>
+                                <a href="{{ url_for('challenges.details', challenge_id=ch.id) }}" class="btn btn-sm btn-outline-secondary py-0 px-2 ms-auto" style="font-size: 0.76rem;">Open</a>
+                            </div>
+                        </div>
+                    {% endfor %}
+                </div>
+            {% else %}
+                <div class="empty-state py-4">
+                    <p class="small mb-2" style="color: var(--text-muted);">No active behavioural challenges right now.</p>
+                    <a href="{{ url_for('challenges.create') }}" class="btn btn-sm text-white" style="background: var(--urge-accent);">Create Challenge</a>
+                </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+window.DASHBOARD_DATA = {
+    rootTasks: {{ summary.root_chart_data | tojson }},
+    weeklyTaskHours: {{ summary.weekly_task_hours_series | tojson }},
+    urgeTrend: {{ summary.daily_urge_trend | tojson }}
+};
+</script>
+<script src="{{ url_for('static', filename='js/dashboard.js') }}"></script>
+{% endblock %}

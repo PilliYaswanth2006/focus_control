@@ -1,0 +1,378 @@
+{% extends "base.html" %}
+{% block title %}Settings — Focus &amp; Control{% endblock %}
+{% block breadcrumbs %}<li class="breadcrumb-item active">Settings</li>{% endblock %}
+
+{% block content %}
+<h1 class="h4 fw-bold mb-1">Settings &amp; Customization</h1>
+<p class="small mb-4" style="color: var(--text-muted);">Configure themes, timezone, session security, budget defaults, and optional demo data.</p>
+
+<div class="row g-4">
+    <!-- General & Budget Settings -->
+    <div class="col-lg-6">
+        <div class="fc-card p-4 h-100">
+            <h2 class="h6 fw-bold mb-3 d-flex align-items-center gap-2">
+                <i data-lucide="sliders" style="width: 17px; height: 17px;"></i>
+                Workspace Preferences
+            </h2>
+            <form method="post" action="{{ url_for('settings.index') }}" class="needs-validation" novalidate>
+                <div class="mb-3">
+                    <label class="form-label small fw-semibold">Display Name</label>
+                    <input type="text" name="display_name" class="form-control" value="{{ settings.display_name }}" required maxlength="80">
+                </div>
+                <div class="row g-3 mb-3">
+                    <div class="col-sm-6">
+                        <label class="form-label small fw-semibold">Theme</label>
+                        <select name="theme" class="form-select">
+                            <option value="light" {% if settings.theme == 'light' %}selected{% endif %}>Light Theme</option>
+                            <option value="dark" {% if settings.theme == 'dark' %}selected{% endif %}>Dark Theme</option>
+                            <option value="system" {% if settings.theme == 'system' %}selected{% endif %}>System (Follow OS)</option>
+                        </select>
+                    </div>
+                    <div class="col-sm-6">
+                        <label class="form-label small fw-semibold">Session Timeout (minutes)</label>
+                        <input type="number" name="session_timeout_minutes" class="form-control" min="5" max="1440" value="{{ settings.session_timeout_minutes }}" required>
+                    </div>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label small fw-semibold">Local Display Timezone</label>
+                    <select name="timezone" class="form-select">
+                        {% for tz in timezones %}
+                            <option value="{{ tz }}" {% if settings.timezone == tz %}selected{% endif %}>{{ tz }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <hr class="my-3" style="border-color: var(--border-color);">
+                <h3 class="h6 fw-semibold mb-2">Default Task Budget Configuration</h3>
+                <div class="row g-2 mb-3">
+                    <div class="col-sm-4">
+                        <label class="form-label small fw-semibold">Mode</label>
+                        <select name="task_budget_mode" class="form-select">
+                            <option value="fixed" {% if settings.task_budget_mode == 'fixed' %}selected{% endif %}>Fixed Budget</option>
+                            <option value="dynamic" {% if settings.task_budget_mode == 'dynamic' %}selected{% endif %}>Dynamic Budget</option>
+                        </select>
+                    </div>
+                    <div class="col-sm-4">
+                        <label class="form-label small fw-semibold">Total Budget</label>
+                        <input type="number" step="0.1" min="0" name="task_total_budget" class="form-control" value="{{ settings.task_total_budget }}" required>
+                    </div>
+                    <div class="col-sm-4">
+                        <label class="form-label small fw-semibold">Unit</label>
+                        <input type="text" name="task_budget_unit" class="form-control" value="{{ settings.task_budget_unit }}" required maxlength="30">
+                    </div>
+                </div>
+
+                <button type="submit" class="btn btn-primary btn-sm px-3">Save Preferences</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Security & Demo Data -->
+    <div class="col-lg-6 d-flex flex-column gap-4">
+        <div class="fc-card p-4">
+            <h2 class="h6 fw-bold mb-3 d-flex align-items-center gap-2">
+                <i data-lucide="key-round" style="width: 17px; height: 17px;"></i>
+                Change Application Lock Credentials
+            </h2>
+            <form method="post" action="{{ url_for('settings.change_credentials') }}" class="needs-validation" novalidate>
+                <div class="row g-2 mb-3">
+                    <div class="col-sm-7">
+                        <label class="form-label small fw-semibold">Current PIN / Password</label>
+                        <div class="input-group input-group-sm">
+                            <input type="password" id="chg-current-cred" name="current_credential" class="form-control" required>
+                            <button type="button" class="btn btn-outline-secondary fc-toggle-secret" data-target="chg-current-cred">Show</button>
+                        </div>
+                    </div>
+                    <div class="col-sm-5">
+                        <label class="form-label small fw-semibold">New Lock Type</label>
+                        <select name="new_credential_type" class="form-select form-select-sm">
+                            <option value="pin" {% if settings.auth_credential_type == 'pin' %}selected{% endif %}>PIN (4-12 digits)</option>
+                            <option value="password" {% if settings.auth_credential_type == 'password' %}selected{% endif %}>Password (6+ chars)</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="row g-2 mb-3">
+                    <div class="col-sm-6">
+                        <label class="form-label small fw-semibold">New Credential</label>
+                        <div class="input-group input-group-sm">
+                            <input type="password" id="chg-new-cred" name="new_credential" class="form-control" required minlength="4">
+                            <button type="button" class="btn btn-outline-secondary fc-toggle-secret" data-target="chg-new-cred">Show</button>
+                        </div>
+                    </div>
+                    <div class="col-sm-6">
+                        <label class="form-label small fw-semibold">Confirm New Credential</label>
+                        <div class="input-group input-group-sm">
+                            <input type="password" id="chg-confirm-cred" name="confirm_credential" class="form-control" required minlength="4">
+                            <button type="button" class="btn btn-outline-secondary fc-toggle-secret" data-target="chg-confirm-cred">Show</button>
+                        </div>
+                    </div>
+                </div>
+                <button type="submit" class="btn btn-outline-primary btn-sm">Update Lock Credentials</button>
+            </form>
+        </div>
+
+        <div class="fc-card p-4">
+            <h2 class="h6 fw-bold mb-2 d-flex align-items-center gap-2">
+                <i data-lucide="database" style="width: 17px; height: 17px;"></i>
+                Optional Demo Workspace Data
+            </h2>
+            <p class="small mb-3" style="color: var(--text-muted);">
+                Sample tasks and challenges are tagged with <code>DEMO</code> and stored separately from your personal records so you can explore features or clear them cleanly anytime.
+            </p>
+            <div class="d-flex flex-wrap gap-2">
+                {% if not demo_loaded %}
+                    <form method="post" action="{{ url_for('settings.load_demo') }}">
+                        <button type="submit" class="btn btn-sm btn-outline-primary">Load Demo Workspace</button>
+                    </form>
+                {% else %}
+                    <span class="badge-demo align-self-center px-2 py-1">DEMO DATA ACTIVE</span>
+                    <form method="post" action="{{ url_for('settings.clear_demo') }}">
+                        <button type="button" class="btn btn-sm btn-outline-danger"
+                                data-confirm-title="Remove Demo Data"
+                                data-confirm-message="Remove all DEMO-tagged tasks and challenges? Your personal records will remain untouched."
+                                data-confirm-btn="Remove Demo Data">
+                            Clear Demo Data
+                        </button>
+                    </form>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Database Backup, Restore & Portability Exports -->
+<div class="fc-card p-4 mt-4">
+    <h2 class="h6 fw-bold mb-3 d-flex align-items-center gap-2">
+        <i data-lucide="hard-drive-download" style="width: 17px; height: 17px;"></i>
+        Database Backup, Restore &amp; Data Export
+    </h2>
+    <div class="row g-4">
+        <div class="col-lg-6">
+            <div class="p-3 rounded-3 border h-100" style="border-color: var(--border-color) !important; background: var(--bg-subtle);">
+                <h3 class="h6 fw-semibold mb-1">SQLite Backup &amp; Restore</h3>
+                <p class="small mb-3" style="color: var(--text-muted);">
+                    Download an atomic SQLite snapshot or restore from an existing backup. Before overwriting, a pre-restore copy is automatically saved in <code>instance/backups/</code>.
+                </p>
+                <div class="mb-3">
+                    <a href="{{ url_for('settings.download_backup') }}" class="btn btn-sm btn-primary d-inline-flex align-items-center gap-1">
+                        <i data-lucide="download" style="width: 14px; height: 14px;"></i>
+                        <span>Download SQLite Backup (.db)</span>
+                    </a>
+                </div>
+                <form method="post" action="{{ url_for('settings.restore_backup') }}" enctype="multipart/form-data" class="border-top pt-3" style="border-color: var(--border-color) !important;">
+                    <label class="form-label small fw-semibold">Restore from Backup (.db / .sqlite)</label>
+                    <div class="d-flex flex-wrap gap-2">
+                        <input type="file" name="backup_file" class="form-control form-control-sm flex-grow-1" style="min-width: 210px;" accept=".db,.sqlite,.sqlite3" required>
+                        <button type="button" class="btn btn-sm btn-outline-warning"
+                                data-confirm-title="Restore SQLite Database"
+                                data-confirm-message="Restore this backup file and replace current active records? An automatic safety backup of the current database will be created first."
+                                data-confirm-btn="Restore Backup"
+                                data-confirm-class="btn-warning">
+                            Restore Database
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <div class="col-lg-6">
+            <div class="p-3 rounded-3 border h-100" style="border-color: var(--border-color) !important; background: var(--bg-subtle);">
+                <h3 class="h6 fw-semibold mb-1">JSON &amp; CSV Portability Exports</h3>
+                <p class="small mb-3" style="color: var(--text-muted);">
+                    Export tasks, progress entries, urge events, reflections, and comments cleanly. Authentication hashes and lockout secrets are automatically excluded.
+                </p>
+                <div class="mb-3 d-flex flex-wrap gap-2">
+                    <a href="{{ url_for('settings.export_json', include_demo='1') }}" class="btn btn-sm btn-outline-primary">Export Full JSON</a>
+                    <a href="{{ url_for('settings.export_json', include_demo='0') }}" class="btn btn-sm btn-outline-secondary">Export Personal JSON (No Demo)</a>
+                </div>
+                <form method="get" action="{{ url_for('settings.export_csv') }}" class="row g-2 align-items-end border-top pt-3" style="border-color: var(--border-color) !important;">
+                    <div class="col-sm-6">
+                        <label class="form-label small fw-semibold mb-1">CSV Dataset</label>
+                        <select name="dataset" class="form-select form-select-sm">
+                            <option value="all">All Datasets (ZIP Bundle)</option>
+                            <option value="tasks">Centered Tasks CSV</option>
+                            <option value="progress_entries">Progress Entries CSV</option>
+                            <option value="challenges">Behavioural Challenges CSV</option>
+                            <option value="urge_events">Urge &amp; Resistance Events CSV</option>
+                            <option value="reflections_comments">Reflections &amp; Comments CSV</option>
+                        </select>
+                    </div>
+                    <div class="col-sm-3">
+                        <label class="form-label small fw-semibold mb-1">Scope</label>
+                        <select name="include_demo" class="form-select form-select-sm">
+                            <option value="1">All Data</option>
+                            <option value="0">Personal Only</option>
+                        </select>
+                    </div>
+                    <div class="col-sm-3">
+                        <button type="submit" class="btn btn-sm btn-success w-100">Download</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Trash & Recover Soft-Deleted Records -->
+{% set _trash_total = (trash.centered_tasks | length) + (trash.task_items | length) + (trash.challenges | length) + (trash.events | length) %}
+<div class="fc-card p-4 mt-4" id="trash-recovery">
+    <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+        <div>
+            <h2 class="h6 fw-bold mb-0 d-flex align-items-center gap-2">
+                <i data-lucide="trash-2" style="width: 17px; height: 17px;"></i>
+                Trash &amp; Recovery ({{ _trash_total }})
+            </h2>
+            <div class="small" style="color: var(--text-muted);">
+                Deleted tasks, items, challenges, and events are soft-deleted here first so you can restore or permanently purge them.
+            </div>
+        </div>
+    </div>
+
+    {% if _trash_total > 0 %}
+        <div class="table-responsive">
+            <table class="table table-sm align-middle mb-0 small">
+                <thead>
+                    <tr>
+                        <th>Type</th>
+                        <th>Item / Summary</th>
+                        <th>Deleted At</th>
+                        <th class="text-end">Recovery Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for ct in trash.centered_tasks %}
+                    <tr>
+                        <td><span class="badge bg-primary-subtle text-primary-emphasis">Centered Task</span></td>
+                        <td>
+                            <strong>{{ ct.name }}</strong>
+                            <span class="ms-1" style="color: var(--text-muted);">({{ ct.weight }}% · {{ ct.status }})</span>
+                        </td>
+                        <td class="text-nowrap" style="color: var(--text-muted);">{{ ct.deleted_at | local_dt }}</td>
+                        <td class="text-end text-nowrap">
+                            <form method="post" action="{{ url_for('tasks.restore', task_id=ct.id) }}" class="d-inline">
+                                <button type="submit" class="btn btn-sm btn-outline-success py-0 px-2">Restore</button>
+                            </form>
+                            <form method="post" action="{{ url_for('tasks.delete', task_id=ct.id) }}" class="d-inline">
+                                <input type="hidden" name="permanent" value="1">
+                                <button type="button" class="btn btn-sm btn-outline-danger py-0 px-2"
+                                        data-confirm-title="Purge Centered Task"
+                                        data-confirm-message="Permanently delete '{{ ct.name }}' and all its items? This cannot be undone."
+                                        data-confirm-btn="Purge Forever"
+                                        data-confirm-input-name="confirm_force"
+                                        data-confirm-input-value="1">Purge</button>
+                            </form>
+                        </td>
+                    </tr>
+                    {% endfor %}
+
+                    {% for it in trash.task_items %}
+                    <tr>
+                        <td><span class="badge bg-info-subtle text-info-emphasis">Internal Task</span></td>
+                        <td>
+                            <strong>{{ it.name }}</strong>
+                            <span class="ms-1" style="color: var(--text-muted);">under {{ it.parent_name }} ({{ it.weight_pct }}%)</span>
+                        </td>
+                        <td class="text-nowrap" style="color: var(--text-muted);">{{ it.deleted_at | local_dt }}</td>
+                        <td class="text-end text-nowrap">
+                            <form method="post" action="{{ url_for('tasks.restore_item', item_id=it.id) }}" class="d-inline">
+                                <button type="submit" class="btn btn-sm btn-outline-success py-0 px-2">Restore</button>
+                            </form>
+                            <form method="post" action="{{ url_for('tasks.delete_item', item_id=it.id) }}" class="d-inline">
+                                <input type="hidden" name="permanent" value="1">
+                                <button type="button" class="btn btn-sm btn-outline-danger py-0 px-2"
+                                        data-confirm-title="Purge Internal Task"
+                                        data-confirm-message="Permanently delete internal task '{{ it.name }}'? This cannot be undone."
+                                        data-confirm-btn="Purge Forever"
+                                        data-confirm-input-name="confirm_force"
+                                        data-confirm-input-value="1">Purge</button>
+                            </form>
+                        </td>
+                    </tr>
+                    {% endfor %}
+
+                    {% for ch in trash.challenges %}
+                    <tr>
+                        <td><span class="badge bg-success-subtle text-success-emphasis">Challenge</span></td>
+                        <td>
+                            <strong>{{ ch.name }}</strong>
+                            <span class="ms-1" style="color: var(--text-muted);">(Avoid: {{ ch.behaviour_to_avoid }})</span>
+                        </td>
+                        <td class="text-nowrap" style="color: var(--text-muted);">{{ ch.deleted_at | local_dt }}</td>
+                        <td class="text-end text-nowrap">
+                            <form method="post" action="{{ url_for('challenges.restore', challenge_id=ch.id) }}" class="d-inline">
+                                <button type="submit" class="btn btn-sm btn-outline-success py-0 px-2">Restore</button>
+                            </form>
+                            <form method="post" action="{{ url_for('challenges.delete', challenge_id=ch.id) }}" class="d-inline">
+                                <input type="hidden" name="permanent" value="1">
+                                <button type="button" class="btn btn-sm btn-outline-danger py-0 px-2"
+                                        data-confirm-title="Purge Challenge"
+                                        data-confirm-message="Permanently delete challenge '{{ ch.name }}' and all its cycles/events? This cannot be undone."
+                                        data-confirm-btn="Purge Forever"
+                                        data-confirm-input-name="confirm_force"
+                                        data-confirm-input-value="1">Purge</button>
+                            </form>
+                        </td>
+                    </tr>
+                    {% endfor %}
+
+                    {% for ev in trash.events %}
+                    <tr>
+                        <td><span class="badge bg-warning-subtle text-warning-emphasis">{{ ev.event_type }} Event</span></td>
+                        <td>
+                            <strong>{{ ev.challenge_name }}</strong>
+                            <span class="ms-1" style="color: var(--text-muted);">· {{ ev.outcome }} ({{ ev.event_timestamp | local_dt }})</span>
+                        </td>
+                        <td class="text-nowrap" style="color: var(--text-muted);">{{ ev.deleted_at | local_dt }}</td>
+                        <td class="text-end text-nowrap">
+                            <form method="post" action="{{ url_for('challenges.restore_event', event_id=ev.id) }}" class="d-inline">
+                                <button type="submit" class="btn btn-sm btn-outline-success py-0 px-2">Restore</button>
+                            </form>
+                            <form method="post" action="{{ url_for('challenges.delete_event', event_id=ev.id) }}" class="d-inline">
+                                <input type="hidden" name="permanent" value="1">
+                                <button type="button" class="btn btn-sm btn-outline-danger py-0 px-2"
+                                        data-confirm-title="Purge Event"
+                                        data-confirm-message="Permanently delete this {{ ev.event_type }} event? This cannot be undone."
+                                        data-confirm-btn="Purge Forever">Purge</button>
+                            </form>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    {% else %}
+        <div class="small" style="color: var(--text-muted);">Trash is empty.</div>
+    {% endif %}
+</div>
+
+<!-- Recent Activity Audit Log -->
+<div class="fc-card p-4 mt-4">
+    <h2 class="h6 fw-bold mb-3">Recent Activity Log</h2>
+    {% if logs %}
+        <div class="table-responsive">
+            <table class="table table-sm align-middle mb-0 small">
+                <thead>
+                    <tr>
+                        <th>Timestamp</th>
+                        <th>Module</th>
+                        <th>Action</th>
+                        <th>Details</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for log in logs %}
+                        <tr>
+                            <td class="text-nowrap" style="color: var(--text-muted);">{{ log.created_at | local_dt }}</td>
+                            <td><span class="badge bg-secondary-subtle text-secondary-emphasis">{{ log.module }}</span></td>
+                            <td class="fw-semibold">{{ log.action }}</td>
+                            <td>{{ log.details }}</td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    {% else %}
+        <div class="small" style="color: var(--text-muted);">No activity logged yet.</div>
+    {% endif %}
+</div>
+{% endblock %}
